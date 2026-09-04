@@ -1,0 +1,68 @@
+# Adblock DNS - starter blocklist
+# Add any domain on its own line to block it
+# Lines starting with # are ignored
+
+# Google ads
+doubleclick.net
+googleadservices.com
+googlesyndication.com
+pagead2.googlesyndication.com
+adservice.google.com
+adservice.google.co.uk
+
+# Google tracking
+google-analytics.com
+googletagmanager.com
+googletagservices.com
+stats.g.doubleclick.net
+ssl.google-analytics.com
+
+# Facebook tracking
+connect.facebook.net
+
+# Ad networks
+advertising.com
+ads.yahoo.com
+aax.amazon-adsystem.com
+freewheel.tv
+ads.freewheel.tv
+cdn.freewheel.tv
+
+# Microsoft telemetry
+vortex.data.microsoft.com
+telemetry.microsoft.com
+watson.telemetry.microsoft.com
+settings-win.data.microsoft.com
+
+# Outbrain / Taboola
+outbrain.com
+widgets.outbrain.com
+taboola.com
+trc.taboola.com
+cdn.taboola.com
+
+# Criteo
+criteo.com
+static.criteo.net
+
+# AppNexus
+adnxs.com
+ib.adnxs.com
+
+# Rubicon
+rubiconproject.com
+
+# OpenX
+openx.net
+
+# Pubmatic
+pubmatic.com
+ads.pubmatic.com
+
+# Quantcast
+quantserve.com
+pixel.quantserve.com
+
+# Media.net
+media.net
+static.media.net

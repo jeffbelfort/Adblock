@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Adblock Dashboard</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #0d0d0d;
+  --surface: #161616;
+  --surface2: #1e1e1e;
+  --surface3: #252525;
+  --border: #2a2a2a;
+  --text: #e0e0e0;
+  --muted: #666;
+  --muted2: #444;
+  --green: #1D9E75;
+  --green-dim: rgba(29,158,117,0.12);
+  --red: #e24b4a;
+  --red-dim: rgba(226,75,74,0.12);
+  --amber: #ef9f27;
+}
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Nav ─────────────────────────────────────────── */
+nav {
+  display: flex;
+  align-items: center;
+  padding: 0 28px;
+  height: 52px;
+  border-bottom: 1px solid var(--border);
+  gap: 24px;
+  flex-shrink: 0;
+}
+.nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-right: 16px;
+}
+.nav-logo-icon {
+  width: 28px; height: 28px;
+  background: var(--green);
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 14px; color: white;
+}
+.nav-logo-text { font-size: 14px; font-weight: 600; color: white; }
+.nav-link {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 13px;
+  padding: 4px 0;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.nav-link:hover { color: var(--text); }
+.nav-link.active { color: white; border-bottom-color: var(--green); }
+.nav-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+.status-dot.red { background: var(--red); }
+
+/* ── Pages ───────────────────────────────────────── */
+.page { display: none; flex: 1; padding: 24px 28px; }
+.page.active { display: block; }
+
+/* ── Grid ────────────────────────────────────────── */
+.grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 16px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.grid-1 { margin-bottom: 16px; }
+
+/* ── Cards ───────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+}
+.card-label {
+  font-size: 11px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+.card-value { font-size: 30px; font-weight: 700; color: var(--green); line-height: 1; }
+.card-sub { font-size: 11px; color: var(--muted); margin-top: 5px; }
+
+/* ── Section title ───────────────────────────────── */
+.section-title {
+  font-size: 11px; font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  margin-bottom: 14px;
+}
+
+/* ── DNS control ─────────────────────────────────── */
+.dns-row {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.dns-status { display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 13px; }
+.btn-row { display: flex; gap: 8px; }
+.btn {
+  padding: 7px 16px; border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface2); color: var(--text);
+  cursor: pointer; font-size: 12px; font-weight: 500;
+  transition: all 0.15s;
+}
+.btn:hover { background: var(--surface3); }
+.btn.green { background: var(--green); border-color: var(--green); color: white; }
+.btn.green:hover { background: #18865f; }
+.btn.red { background: var(--red); border-color: var(--red); color: white; }
+.btn.red:hover { background: #c43a39; }
+
+/* ── Layers ──────────────────────────────────────── */
+.layer-row {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--surface2);
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+.layer-row:last-child { margin-bottom: 0; }
+.layer-name { font-size: 13px; font-weight: 500; }
+.layer-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.badge {
+  padding: 2px 9px; border-radius: 4px;
+  font-size: 11px; font-weight: 600;
+}
+.badge.active { background: var(--green-dim); color: var(--green); }
+.badge.inactive { background: var(--red-dim); color: var(--red); }
+
+/* ── Log list ────────────────────────────────────── */
+.log-list { max-height: 300px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.log-item {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.log-item:last-child { border-bottom: none; }
+.log-domain { color: var(--red); font-family: monospace; font-size: 12px; }
+.log-time { color: var(--muted); font-size: 11px; white-space: nowrap; margin-left: 12px; }
+.log-empty { color: var(--muted); text-align: center; padding: 28px 0; font-size: 12px; }
+
+/* ── Blocklist items ─────────────────────────────── */
+.list-item {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.list-item:last-child { border-bottom: none; }
+.list-name { font-family: monospace; }
+.list-count {
+  background: var(--surface2); padding: 2px 8px;
+  border-radius: 4px; font-size: 11px; color: var(--muted);
+}
+
+/* ── Add domain ──────────────────────────────────── */
+.add-row { display: flex; gap: 8px; margin-top: 14px; }
+.add-row input {
+  flex: 1; padding: 7px 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 7px; color: var(--text);
+  font-size: 12px; outline: none;
+}
+.add-row input:focus { border-color: var(--green); }
+.add-row input::placeholder { color: var(--muted2); }
+
+/* ── Graph ───────────────────────────────────────── */
+.graph-wrap {
+  position: relative; height: 180px;
+  margin-bottom: 8px;
+  display: block;
+}
+canvas#graph { display: block; width: 100%; height: 180px; }
+.graph-labels {
+  display: flex; justify-content: space-between;
+  padding: 0 2px;
+}
+.graph-label { font-size: 10px; color: var(--muted); }
+
+/* ── History page ────────────────────────────────── */
+.history-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.top-domain-row {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.top-domain-row:last-child { border-bottom: none; }
+.top-domain { font-family: monospace; color: var(--red); }
+.top-count {
+  background: var(--surface2); padding: 2px 8px;
+  border-radius: 4px; font-size: 11px; color: var(--muted);
+  white-space: nowrap; margin-left: 8px;
+}
+.bar-wrap { display: flex; align-items: center; gap: 8px; }
+.bar {
+  height: 4px; background: var(--green);
+  border-radius: 2px; min-width: 2px;
+}
+
+/* ── Toast ───────────────────────────────────────── */
+.toast {
+  position: fixed; bottom: 20px; right: 20px;
+  background: var(--green); color: white;
+  padding: 9px 18px; border-radius: 7px;
+  font-size: 12px; font-weight: 500;
+  opacity: 0; transition: opacity 0.25s;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; }
+.toast.error { background: var(--red); }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">
+    <div class="nav-logo-icon">A</div>
+    <div class="nav-logo-text">Adblock</div>
+  </div>
+  <span class="nav-link active" onclick="showPage('overview', this)">Overview</span>
+  <span class="nav-link" onclick="showPage('history', this)">History</span>
+  <div class="nav-right">
+    <div class="status-dot" id="nav-dot"></div>
+    <span id="nav-status">Checking...</span>
+  </div>
+</nav>
+
+<!-- ── Page: Overview ────────────────────────────── -->
+<div class="page active" id="page-overview">
+
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-label">Blocked today</div>
+      <div class="card-value" id="blocked-today">—</div>
+      <div class="card-sub">DNS layer</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Blocked total</div>
+      <div class="card-value" id="blocked-total">—</div>
+      <div class="card-sub">All time</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Domains in blocklist</div>
+      <div class="card-value" id="domain-count">—</div>
+      <div class="card-sub">Across all lists</div>
+    </div>
+  </div>
+
+  <!-- Graph -->
+  <div class="card grid-1">
+    <div class="section-title">Blocks per hour — last 24h</div>
+    <div class="graph-wrap">
+      <canvas id="graph"></canvas>
+    </div>
+    <div class="graph-labels" id="graph-labels"></div>
+  </div>
+
+  <div class="grid-2">
+
+    <!-- DNS control -->
+    <div class="card">
+      <div class="section-title">DNS layer</div>
+      <div class="dns-row">
+        <div class="dns-status">
+          <div class="status-dot" id="dns-dot"></div>
+          <span id="dns-label">Checking...</span>
+        </div>
+        <div class="btn-row">
+          <button class="btn green" onclick="startDNS()">Start</button>
+          <button class="btn red" onclick="stopDNS()">Stop</button>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.7;">
+        Blocks ad domains system-wide before any connection is made.
+        Stopping disables network-level blocking — the Chrome extension stays active.
+      </div>
+    </div>
+
+    <!-- Active layers -->
+    <div class="card">
+      <div class="section-title">Active layers</div>
+      <div class="layer-row">
+        <div>
+          <div class="layer-name">DNS blocking</div>
+          <div class="layer-desc">System-wide · 127.0.0.1:53</div>
+        </div>
+        <span class="badge active" id="dns-layer-badge">active</span>
+      </div>
+      <div class="layer-row">
+        <div>
+          <div class="layer-name">Request blocking</div>
+          <div class="layer-desc">Chrome extension · declarativeNetRequest</div>
+        </div>
+        <span class="badge active">active</span>
+      </div>
+      <div class="layer-row">
+        <div>
+          <div class="layer-name">Cosmetic filtering</div>
+          <div class="layer-desc">Chrome extension · DOM removal</div>
+        </div>
+        <span class="badge active">active</span>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="grid-2">
+
+    <!-- Recent blocks -->
+    <div class="card">
+      <div class="section-title">Recently blocked</div>
+      <div class="log-list" id="log-list">
+        <div class="log-empty">Loading...</div>
+      </div>
+    </div>
+
+    <!-- Blocklists -->
+    <div class="card">
+      <div class="section-title">Blocklists</div>
+      <div id="blocklist-items">
+        <div class="log-empty">Loading...</div>
+      </div>
+      <div class="add-row">
+        <input type="text" id="domain-input" placeholder="Block a domain e.g. ads.example.com" />
+        <button class="btn green" onclick="addDomain()">Add</button>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- ── Page: History ──────────────────────────────── -->
+<div class="page" id="page-history">
+
+  <div class="grid-3" style="margin-bottom:16px;">
+    <div class="card">
+      <div class="card-label">Total blocks logged</div>
+      <div class="card-value" id="h-total">—</div>
+      <div class="card-sub">All time in log file</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Unique domains blocked</div>
+      <div class="card-value" id="h-unique">—</div>
+      <div class="card-sub">Distinct domains</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Most blocked</div>
+      <div class="card-value" style="font-size:13px;padding-top:6px;" id="h-top">—</div>
+      <div class="card-sub" id="h-top-count"></div>
+    </div>
+  </div>
+
+  <div class="history-grid">
+
+    <!-- Top domains -->
+    <div class="card">
+      <div class="section-title">Top blocked domains</div>
+      <div class="log-list" id="top-domains">
+        <div class="log-empty">Loading...</div>
+      </div>
+    </div>
+
+    <!-- Full log -->
+    <div class="card">
+      <div class="section-title">Full block log</div>
+      <div class="log-list" id="full-log">
+        <div class="log-empty">Loading...</div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'http://localhost:9001/api';
+let graphData = { labels: [], values: [] };
+
+// ── Page routing ───────────────────────────────────
+function showPage(id, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  el.classList.add('active');
+  if (id === 'history') fetchHistory();
+}
+
+// ── Toast ──────────────────────────────────────────
+function showToast(msg, error = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (error ? ' error' : '');
+  setTimeout(() => t.className = 'toast', 2500);
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Status ─────────────────────────────────────────
+async function fetchStatus() {
+  try {
+    const r = await fetch(API + '/status');
+    const d = await r.json();
+
+    document.getElementById('blocked-today').textContent = d.blocked_today.toLocaleString();
+    document.getElementById('blocked-total').textContent = d.blocked_total.toLocaleString();
+    document.getElementById('domain-count').textContent = d.domain_count.toLocaleString();
+
+    const running = d.dns_running;
+    const dot = running ? 'status-dot' : 'status-dot red';
+    document.getElementById('dns-dot').className = dot;
+    document.getElementById('nav-dot').className = dot;
+    document.getElementById('dns-label').textContent = running ? 'Running on 127.0.0.1:53' : 'Stopped';
+    document.getElementById('nav-status').textContent = running ? 'All systems active' : 'DNS stopped';
+    document.getElementById('dns-layer-badge').textContent = running ? 'active' : 'stopped';
+    document.getElementById('dns-layer-badge').className = 'badge ' + (running ? 'active' : 'inactive');
+  } catch(e) {}
+}
+
+// ── Logs ───────────────────────────────────────────
+async function fetchLogs() {
+  try {
+    const r = await fetch(API + '/dns/logs');
+    const logs = await r.json();
+    const el = document.getElementById('log-list');
+    if (!logs.length) {
+      el.innerHTML = '<div class="log-empty">No blocks recorded yet</div>';
+      return;
+    }
+    el.innerHTML = [...logs].reverse().map(l => `
+      <div class="log-item">
+        <span class="log-domain">${esc(l.domain)}</span>
+        <span class="log-time">${esc(l.time)}</span>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+// ── Blocklists ─────────────────────────────────────
+async function fetchBlocklists() {
+  try {
+    const r = await fetch(API + '/blocklists');
+    const lists = await r.json();
+    const el = document.getElementById('blocklist-items');
+    if (!lists.length) {
+      el.innerHTML = '<div class="log-empty">No blocklists found</div>';
+      return;
+    }
+    el.innerHTML = lists.map(l => `
+      <div class="list-item">
+        <span class="list-name">${esc(l.name)}</span>
+        <span class="list-count">${l.count.toLocaleString()} domains</span>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+// ── Graph ──────────────────────────────────────────
+async function fetchGraph() {
+  try {
+    const r = await fetch(API + '/dns/graph');
+    graphData = await r.json();
+    drawGraph();
+  } catch(e) {}
+}
+
+function drawGraph() {
+  const canvas = document.getElementById('graph');
+  const wrap = canvas.parentElement;
+  canvas.width = wrap.offsetWidth || 600;
+  canvas.height = 180;
+  const ctx = canvas.getContext('2d');
+  const { labels, values } = graphData;
+  if (!values || !values.length) return;
+
+  const W = canvas.width, H = canvas.height;
+  const pad = { top: 12, right: 8, bottom: 4, left: 36 };
+  const gW = W - pad.left - pad.right;
+  const gH = H - pad.top - pad.bottom;
+  const max = Math.max(...values, 1);
+  const barW = gW / values.length;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Grid lines
+  ctx.strokeStyle = '#222';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.top + (gH / 4) * i;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(W - pad.right, y);
+    ctx.stroke();
+    // Y labels
+    const val = Math.round(max - (max / 4) * i);
+    ctx.fillStyle = '#444';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(val, pad.left - 4, y + 3);
+  }
+
+  // Bars
+  values.forEach((v, i) => {
+    const x = pad.left + i * barW;
+    const bH = (v / max) * gH;
+    const y = pad.top + gH - bH;
+
+    // Bar fill with gradient
+    const grad = ctx.createLinearGradient(0, y, 0, y + bH);
+    grad.addColorStop(0, '#1D9E75');
+    grad.addColorStop(1, 'rgba(29,158,117,0.3)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.roundRect(x + 2, y, barW - 4, bH, [3, 3, 0, 0]);
+    ctx.fill();
+  });
+
+  // X labels — show every 6 hours
+  const labelEl = document.getElementById('graph-labels');
+  const shown = labels.filter((_, i) => i % 6 === 0);
+  labelEl.innerHTML = shown.map(l => `<span class="graph-label">${esc(l)}</span>`).join('');
+}
+
+// ── History page ───────────────────────────────────
+async function fetchHistory() {
+  try {
+    const r = await fetch(API + '/dns/history');
+    const d = await r.json();
+
+    const total = d.entries ? d.entries.length : 0;
+    const unique = d.top_domains ? d.top_domains.length : 0;
+    document.getElementById('h-total').textContent = total.toLocaleString();
+    document.getElementById('h-unique').textContent = unique.toLocaleString();
+
+    if (d.top_domains && d.top_domains.length) {
+      document.getElementById('h-top').textContent = d.top_domains[0].domain;
+      document.getElementById('h-top-count').textContent = d.top_domains[0].count + ' blocks';
+    }
+
+    // Top domains
+    const maxCount = d.top_domains && d.top_domains[0] ? d.top_domains[0].count : 1;
+    const topEl = document.getElementById('top-domains');
+    if (!d.top_domains || !d.top_domains.length) {
+      topEl.innerHTML = '<div class="log-empty">No data yet</div>';
+    } else {
+      topEl.innerHTML = d.top_domains.slice(0, 50).map(t => `
+        <div class="top-domain-row">
+          <span class="top-domain">${esc(t.domain)}</span>
+          <div class="bar-wrap">
+            <div class="bar" style="width:${Math.max(4, (t.count/maxCount)*80)}px"></div>
+            <span class="top-count">${t.count.toLocaleString()}</span>
+          </div>
+        </div>`).join('');
+    }
+
+    // Full log
+    const logEl = document.getElementById('full-log');
+    if (!d.entries || !d.entries.length) {
+      logEl.innerHTML = '<div class="log-empty">No data yet</div>';
+    } else {
+      logEl.innerHTML = [...d.entries].reverse().map(e => `
+        <div class="log-item">
+          <span class="log-domain">${esc(e.domain)}</span>
+          <span class="log-time">${esc(e.time)}</span>
+        </div>`).join('');
+    }
+  } catch(e) { console.error(e); }
+}
+
+// ── DNS controls ───────────────────────────────────
+async function startDNS() {
+  try {
+    const r = await fetch(API + '/dns/start', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) { showToast('DNS layer started'); fetchStatus(); }
+    else showToast('Failed: ' + d.error, true);
+  } catch(e) { showToast('Could not reach API', true); }
+}
+
+async function stopDNS() {
+  try {
+    const r = await fetch(API + '/dns/stop', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) { showToast('DNS layer stopped'); fetchStatus(); }
+    else showToast('Failed: ' + d.error, true);
+  } catch(e) { showToast('Could not reach API', true); }
+}
+
+async function addDomain() {
+  const input = document.getElementById('domain-input');
+  const domain = input.value.trim();
+  if (!domain) return;
+  try {
+    const r = await fetch(API + '/blocklists/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ domain })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      showToast(domain + ' added — restart DNS to apply');
+      input.value = '';
+      fetchBlocklists();
+    } else showToast('Failed: ' + d.error, true);
+  } catch(e) { showToast('Could not reach API', true); }
+}
+
+// ── Init ───────────────────────────────────────────
+fetchStatus();
+fetchLogs();
+fetchBlocklists();
+fetchGraph();
+
+setInterval(fetchStatus, 5000);
+setInterval(fetchLogs, 10000);
+setInterval(fetchGraph, 60000);
+window.addEventListener('resize', drawGraph);
+</script>
+</body>
+</html>

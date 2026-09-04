@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Adblock — Dashboard</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #111;
+  --surface: #1a1a1a;
+  --surface2: #222;
+  --surface3: #2a2a2a;
+  --border: #2e2e2e;
+  --text: #e0e0e0;
+  --muted: #666;
+  --muted2: #444;
+  --green: #1D9E75;
+  --green-dim: rgba(29,158,117,0.1);
+  --red: #e24b4a;
+  --red-dim: rgba(226,75,74,0.1);
+  --blue: #4a9eff;
+}
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Layout ───────────────────────────────────────── */
+.app { display: flex; flex: 1; }
+
+/* ── Sidebar ──────────────────────────────────────── */
+.sidebar {
+  width: 200px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  padding: 16px 0;
+}
+.sidebar-logo {
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 16px 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+.logo-icon {
+  width: 28px; height: 28px;
+  background: var(--green);
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 14px; color: white;
+}
+.logo-text { font-size: 14px; font-weight: 600; }
+.logo-version { font-size: 10px; color: var(--muted); }
+
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 16px;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+  border-left: 2px solid transparent;
+  transition: all 0.15s;
+}
+.nav-item:hover { color: var(--text); background: var(--surface2); }
+.nav-item.active { color: var(--text); border-left-color: var(--green); background: var(--surface2); }
+.nav-item svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+.sidebar-bottom {
+  margin-top: auto;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+.dns-indicator {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; color: var(--muted);
+}
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+.dot.red { background: var(--red); }
+
+/* ── Main content ─────────────────────────────────── */
+.main { flex: 1; overflow-y: auto; }
+.page { display: none; padding: 28px; max-width: 900px; }
+.page.active { display: block; }
+.page-title { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+.page-sub { font-size: 12px; color: var(--muted); margin-bottom: 24px; }
+
+/* ── Cards ────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.card-title {
+  font-size: 11px; font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  margin-bottom: 14px;
+}
+
+/* ── Stats grid ───────────────────────────────────── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+.stat-value { font-size: 28px; font-weight: 700; color: var(--green); line-height: 1; }
+.stat-label { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+/* ── Filter lists ─────────────────────────────────── */
+.filter-list-item {
+  display: flex; align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+}
+.filter-list-item:last-child { border-bottom: none; }
+.filter-list-info { flex: 1; min-width: 0; }
+.filter-list-name { font-size: 13px; font-weight: 500; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.filter-list-meta { font-size: 11px; color: var(--muted); }
+.filter-list-count { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.filter-list-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+.btn {
+  padding: 6px 14px; border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface2); color: var(--text);
+  cursor: pointer; font-size: 12px; font-weight: 500;
+  transition: all 0.15s; white-space: nowrap;
+}
+.btn:hover { background: var(--surface3); }
+.btn.primary { background: var(--green); border-color: var(--green); color: white; }
+.btn.primary:hover { background: #18865f; }
+.btn.danger { background: var(--red); border-color: var(--red); color: white; }
+.btn.danger:hover { opacity: 0.85; }
+.btn.sm { padding: 4px 10px; font-size: 11px; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Add filter URL ───────────────────────────────── */
+.add-row { display: flex; gap: 8px; margin-bottom: 16px; }
+.input {
+  flex: 1; padding: 8px 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 7px; color: var(--text);
+  font-size: 13px; outline: none;
+  transition: border-color 0.15s;
+}
+.input:focus { border-color: var(--green); }
+.input::placeholder { color: var(--muted2); }
+
+/* ── Preset lists ─────────────────────────────────── */
+.preset-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--surface2);
+  border-radius: 7px;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+.preset-name { font-weight: 500; }
+.preset-desc { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+/* ── Custom filters editor ────────────────────────── */
+.filter-editor {
+  width: 100%; min-height: 300px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text);
+  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  font-size: 12px;
+  padding: 12px;
+  outline: none;
+  resize: vertical;
+  line-height: 1.6;
+  transition: border-color 0.15s;
+}
+.filter-editor:focus { border-color: var(--green); }
+.editor-actions { display: flex; gap: 8px; margin-top: 10px; justify-content: flex-end; }
+
+/* ── Log ──────────────────────────────────────────── */
+.log-list { max-height: 500px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.log-item {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  gap: 12px;
+}
+.log-item:last-child { border-bottom: none; }
+.log-domain { color: var(--red); font-family: monospace; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.log-source { color: var(--muted); font-size: 10px; white-space: nowrap; }
+.log-time { color: var(--muted2); font-size: 10px; white-space: nowrap; }
+.log-empty { color: var(--muted); text-align: center; padding: 32px 0; font-size: 12px; }
+
+/* ── Whitelist ────────────────────────────────────── */
+.whitelist-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.whitelist-item:last-child { border-bottom: none; }
+.whitelist-domain { font-family: monospace; }
+
+/* ── Toggle ───────────────────────────────────────── */
+.toggle {
+  width: 36px; height: 20px;
+  background: var(--muted2);
+  border-radius: 10px; border: none;
+  cursor: pointer; position: relative;
+  transition: background 0.2s; flex-shrink: 0;
+}
+.toggle.on { background: var(--green); }
+.toggle::after {
+  content: ''; position: absolute;
+  width: 14px; height: 14px;
+  background: white; border-radius: 50%;
+  top: 3px; left: 3px;
+  transition: transform 0.2s;
+}
+.toggle.on::after { transform: translateX(16px); }
+
+/* ── Settings rows ────────────────────────────────── */
+.setting-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.setting-row:last-child { border-bottom: none; }
+.setting-label { font-size: 13px; font-weight: 500; }
+.setting-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+/* ── Badge ────────────────────────────────────────── */
+.badge {
+  padding: 2px 8px; border-radius: 4px;
+  font-size: 10px; font-weight: 600;
+}
+.badge.green { background: var(--green-dim); color: var(--green); }
+.badge.red { background: var(--red-dim); color: var(--red); }
+
+/* ── Toast ────────────────────────────────────────── */
+.toast {
+  position: fixed; bottom: 20px; right: 20px;
+  background: var(--green); color: white;
+  padding: 9px 18px; border-radius: 7px;
+  font-size: 12px; font-weight: 500;
+  opacity: 0; transition: opacity 0.25s;
+  pointer-events: none; z-index: 100;
+}
+.toast.show { opacity: 1; }
+.toast.error { background: var(--red); }
+
+.spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin 0.6s linear infinite; margin-right: 6px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ── Sidebar ──────────────────────────────────── -->
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">A</div>
+    <div>
+      <div class="logo-text">Adblock</div>
+      <div class="logo-version">v2.0</div>
+    </div>
+  </div>
+
+  <div class="nav-item active" data-page="overview">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+    Overview
+  </div>
+  <div class="nav-item" data-page="filters">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    Filter Lists
+  </div>
+  <div class="nav-item" data-page="custom">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+    My Filters
+  </div>
+  <div class="nav-item" data-page="logs">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+    Logs
+  </div>
+  <div class="nav-item" data-page="whitelist">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    Whitelist
+  </div>
+  <div class="nav-item" data-page="settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    Settings
+  </div>
+
+  <div class="sidebar-bottom">
+    <div class="dns-indicator">
+      <div class="dot" id="dns-dot"></div>
+      <span id="dns-label">DNS: checking...</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── Main ─────────────────────────────────────── -->
+<div class="main">
+
+  <!-- Overview -->
+  <div class="page active" id="page-overview">
+    <div class="page-title">Overview</div>
+    <div class="page-sub">Blocking stats and active layer status</div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="stat-today">0</div>
+        <div class="stat-label">Blocked today</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-total">0</div>
+        <div class="stat-label">Blocked total</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-lists">0</div>
+        <div class="stat-label">Filter lists</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-rules">0</div>
+        <div class="stat-label">Active rules</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Active layers</div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">DNS blocking</div>
+          <div class="setting-desc">System-wide · 127.0.0.1:53 · 82,000+ domains</div>
+        </div>
+        <span class="badge green" id="dns-badge">active</span>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Request blocking</div>
+          <div class="setting-desc">declarativeNetRequest · static + dynamic filter lists</div>
+        </div>
+        <span class="badge green">active</span>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Cosmetic filtering</div>
+          <div class="setting-desc">DOM element removal · MutationObserver</div>
+        </div>
+        <span class="badge green">active</span>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Platform ad skip</div>
+          <div class="setting-desc">YouTube · ITVX · SoundCloud</div>
+        </div>
+        <span class="badge green">active</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">DNS control</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div class="setting-label" id="dns-status-text">Checking...</div>
+          <div class="setting-desc">Stops network-level blocking. Extension stays active.</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn primary" id="btn-dns-start">Start</button>
+          <button class="btn danger" id="btn-dns-stop">Stop</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter Lists -->
+  <div class="page" id="page-filters">
+    <div class="page-title">Filter Lists</div>
+    <div class="page-sub">Subscribe to filter lists using uBlock Origin / EasyList format URLs</div>
+
+    <div class="card">
+      <div class="card-title">Add filter list</div>
+      <div class="add-row">
+        <input class="input" id="filter-url-input" placeholder="https://filters.adtidy.org/extension/ublock/filters/2.txt" />
+        <button class="btn primary" id="btn-add-filter">Subscribe</button>
+      </div>
+      <div class="card-title" style="margin-bottom:10px;">Quick add — popular lists</div>
+      <div class="preset-item">
+        <div>
+          <div class="preset-name">EasyList</div>
+          <div class="preset-desc">Primary ad blocking list for English-language sites</div>
+        </div>
+        <button class="btn sm" data-preset="https://easylist.to/easylist/easylist.txt">Add</button>
+      </div>
+      <div class="preset-item">
+        <div>
+          <div class="preset-name">EasyPrivacy</div>
+          <div class="preset-desc">Tracking and analytics blocking</div>
+        </div>
+        <button class="btn sm" data-preset="https://easylist.to/easylist/easyprivacy.txt">Add</button>
+      </div>
+      <div class="preset-item">
+        <div>
+          <div class="preset-name">uBlock Filters</div>
+          <div class="preset-desc">uBlock Origin's own filter list</div>
+        </div>
+        <button class="btn sm" data-preset="https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/filters.txt">Add</button>
+      </div>
+      <div class="preset-item">
+        <div>
+          <div class="preset-name">uBlock Annoyances</div>
+          <div class="preset-desc">Cookie banners, newsletter popups, social widgets</div>
+        </div>
+        <button class="btn sm" data-preset="https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/annoyances.txt">Add</button>
+      </div>
+      <div class="preset-item">
+        <div>
+          <div class="preset-name">Peter Lowe's List</div>
+          <div class="preset-desc">Ad and tracking server blocklist</div>
+        </div>
+        <button class="btn sm" data-preset="https://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts&showintro=0&mimetype=plaintext">Add</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Subscribed lists</div>
+      <div id="filter-list-items"><div class="log-empty">No filter lists added yet</div></div>
+    </div>
+  </div>
+
+  <!-- My Filters -->
+  <div class="page" id="page-custom">
+    <div class="page-title">My Filters</div>
+    <div class="page-sub">Write custom filters in uBlock Origin syntax. One filter per line.</div>
+
+    <div class="card">
+      <div class="card-title">Syntax reference</div>
+      <div style="font-family:monospace;font-size:11px;color:var(--muted);line-height:2;">
+        <div><span style="color:var(--text)">||ads.example.com^</span> &nbsp;— block domain</div>
+        <div><span style="color:var(--text)">||example.com/ads/*</span> &nbsp;— block URL path</div>
+        <div><span style="color:var(--text)">@@||example.com^</span> &nbsp;— whitelist domain</div>
+        <div><span style="color:var(--text)">example.com##.ad-banner</span> &nbsp;— hide element</div>
+        <div><span style="color:var(--text)">example.com#@#.ad-banner</span> &nbsp;— un-hide element</div>
+        <div><span style="color:var(--text)">! This is a comment</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Custom filters</div>
+      <textarea class="filter-editor" id="custom-filter-editor" placeholder="! Add your custom filters here&#10;! Example:&#10;||ads.example.com^&#10;example.com##.sponsored-content"></textarea>
+      <div class="editor-actions">
+        <button class="btn" id="btn-revert">Revert</button>
+        <button class="btn primary" id="btn-save-filters">Apply filters</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Logs -->
+  <div class="page" id="page-logs">
+    <div class="page-title">Request Log</div>
+    <div class="page-sub">Recently blocked requests from the DNS layer</div>
+
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <div class="card-title" style="margin:0;">Blocked domains</div>
+        <button class="btn sm" id="btn-refresh-logs">Refresh</button>
+      </div>
+      <div class="log-list" id="log-list"><div class="log-empty">Loading...</div></div>
+    </div>
+  </div>
+
+  <!-- Whitelist -->
+  <div class="page" id="page-whitelist">
+    <div class="page-title">Whitelist</div>
+    <div class="page-sub">Sites where ad blocking is paused. You can also toggle per-site from the popup.</div>
+
+    <div class="card">
+      <div class="add-row" style="margin-bottom:14px;">
+        <input class="input" id="whitelist-input" placeholder="example.com" />
+        <button class="btn primary" id="btn-add-whitelist">Add</button>
+      </div>
+      <div id="whitelist-items"><div class="log-empty">No sites whitelisted</div></div>
+    </div>
+  </div>
+
+  <!-- Settings -->
+  <div class="page" id="page-settings">
+    <div class="page-title">Settings</div>
+    <div class="page-sub">Configure blocking behaviour</div>
+
+    <div class="card">
+      <div class="card-title">Blocking layers</div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Request blocking</div>
+          <div class="setting-desc">Enable/disable all declarativeNetRequest rules</div>
+        </div>
+        <button class="toggle on" id="setting-requests" data-setting="requests"></button>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Cosmetic filtering</div>
+          <div class="setting-desc">Remove ad elements from page DOM</div>
+        </div>
+        <button class="toggle on" id="setting-cosmetic" data-setting="cosmetic"></button>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">YouTube ad skip</div>
+          <div class="setting-desc">Auto-skip YouTube pre-roll and mid-roll ads</div>
+        </div>
+        <button class="toggle on" id="setting-youtube" data-setting="youtube"></button>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">ITVX ad skip</div>
+          <div class="setting-desc">Auto-skip ITVX pre-roll ads via ended event</div>
+        </div>
+        <button class="toggle on" id="setting-itvx" data-setting="itvx"></button>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">SoundCloud ad blocking</div>
+          <div class="setting-desc">Block DAX audio ad network endpoints</div>
+        </div>
+        <button class="toggle on" id="setting-soundcloud" data-setting="soundcloud"></button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Filter list sync</div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Auto-sync filter lists</div>
+          <div class="setting-desc">Update subscribed lists every 4 hours</div>
+        </div>
+        <button class="toggle on" id="setting-autosync" data-setting="autosync"></button>
+      </div>
+      <div style="margin-top:12px;">
+        <button class="btn" id="btn-sync-all">Sync all lists now</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="dashboard.js"></script>
+</body>
+</html>

@@ -1,0 +1,84 @@
+# Adult ad networks blocklist
+# Drop this file into your dns/blocklists/ folder and restart AdblockDNS
+# These are ad networks specifically associated with adult content sites
+# They frequently serve malicious/malware ads
+
+# TrafficJunky (Pornhub's ad network)
+trafficjunky.com
+trafficjunky.net
+ads.trafficjunky.net
+static.trafficjunky.net
+
+# ExoClick
+exoclick.com
+ads.exoclick.com
+syndication.exoclick.com
+static.exoclick.com
+
+# TrafficHaus
+traffichaus.com
+ads.traffichaus.com
+
+# JuicyAds
+juicyads.com
+ads.juicyads.com
+cdn.juicyads.com
+
+# PlugRush
+plugrush.com
+ads.plugrush.com
+
+# AdXpansion
+adxpansion.com
+
+# EroAdvertising
+ero-advertising.com
+ads.ero-advertising.com
+
+# AdultAdWorld
+adultadworld.com
+
+# Trafmag
+trafmag.com
+
+# ClickAdu
+clickadu.com
+ads.clickadu.com
+
+# PopAds
+popads.net
+popcash.net
+
+# PropellerAds (frequently used on adult sites)
+propellerads.com
+cdn.propellerads.com
+go.propellerads.com
+
+# AdsTerra (frequently serves malicious ads)
+adsterra.com
+ads.adsterra.com
+
+# Hilltop Ads
+hilltopads.net
+hilltopads.com
+
+# ReklamStore
+reklamstore.com
+
+# PlugRush
+plugrush.com
+
+# Reporo
+reporo.com
+ads.reporo.com
+
+# Adult Force
+adultforce.com
+
+# General malvertising domains commonly seen on adult sites
+track.affiliate-master.com
+adnium.com
+ads.adnium.com
+tsyndicate.com
+fuckingawesome.com
+contentabc.com

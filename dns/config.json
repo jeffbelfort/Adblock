@@ -1,0 +1,6 @@
+{
+  "listen": "127.0.0.1:53",
+  "upstream": "1.1.1.1:53",
+  "blocklist_dir": "C:\\\\Users\\\\owner\\\\Documents\\\\Adblock\\\\dns\\\\blocklists",
+  "cache_ttl": 300
+}
