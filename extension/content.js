@@ -121,7 +121,6 @@ const cosmeticRules = {
   ],
 
   'youtube.com': [
-    '.ytp-ad-module',
     '.ytp-ad-overlay-container',
     '.ytp-ad-text-overlay',
 
@@ -473,6 +472,8 @@ async function refreshDynamicCosmeticCache() {
 // YouTube procedural behaviour
 // ─────────────────────────────────────────────────────────────────────────────
 
+let youtubeAdPlaybackState = null;
+
 function skipYouTubeAd() {
   if (
     isWhitelisted ||
@@ -487,10 +488,14 @@ function skipYouTubeAd() {
 
   const skipButton =
     document.querySelector(
-      '.ytp-skip-ad-button, .ytp-ad-skip-button'
+      '.ytp-skip-ad-button, .ytp-ad-skip-button, .ytp-ad-skip-button-modern'
     );
 
-  if (skipButton) {
+  if (
+    skipButton &&
+    skipButton.offsetParent !== null &&
+    !skipButton.disabled
+  ) {
     skipButton.click();
 
     chrome.runtime.sendMessage({
@@ -502,24 +507,64 @@ function skipYouTubeAd() {
   }
 
   const video =
-    document.querySelector('video');
+    document.querySelector(
+      'video.html5-main-video, video'
+    );
+
+  const player =
+    document.querySelector(
+      '.html5-video-player'
+    );
 
   const adShowing =
-    document.querySelector('.ad-showing');
+    !!(
+      player &&
+      player.classList.contains('ad-showing')
+    );
 
   if (
     video &&
     adShowing
   ) {
+    if (!youtubeAdPlaybackState) {
+      youtubeAdPlaybackState = {
+        playbackRate: video.playbackRate || 1,
+        muted: video.muted,
+      };
+    }
+
+    // Fast-play an unskippable ad instead of jumping currentTime directly
+    // to duration. Directly forcing the media element to "ended" can leave
+    // YouTube's internal player state stuck after the ad.
     video.muted = true;
 
-    if (
-      video.duration &&
-      isFinite(video.duration)
-    ) {
-      video.currentTime =
-        video.duration;
+    try {
+      if (video.playbackRate < 16) {
+        video.playbackRate = 16;
+      }
+    } catch {
+      // Ignore browsers/player states that reject a playback-rate change.
     }
+
+    return;
+  }
+
+  if (
+    video &&
+    !adShowing &&
+    youtubeAdPlaybackState
+  ) {
+    try {
+      video.playbackRate =
+        youtubeAdPlaybackState.playbackRate;
+    } catch {
+      // Ignore restore failures.
+    }
+
+    video.muted =
+      youtubeAdPlaybackState.muted;
+
+    youtubeAdPlaybackState = null;
   }
 }
 
