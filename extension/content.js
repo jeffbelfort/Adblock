@@ -1,11 +1,107 @@
-// content.js - Runs on every page
-// Handles cosmetic filtering (removing ad elements) and YouTube ad skipping
+// content.js
+// Cosmetic filtering is primarily declarative CSS.
+// JavaScript is retained only for procedural/site-specific behaviour.
 
-const host = location.hostname;
+const host = location.hostname.toLowerCase();
+const cleanHost = host.replace(/^www\./, '');
 
-// ── Cosmetic filter rules ──────────────────────────────────────────────────
+const DEFAULT_SETTINGS = {
+  requests: true,
+  cosmetic: true,
+  youtube: true,
+  itvx: true,
+  soundcloud: true,
+  autosync: true,
+};
+
+let settings = { ...DEFAULT_SETTINGS };
+let whitelist = [];
+let isWhitelisted = false;
+
+let dynamicCosmeticRules = [];
+let applicableDynamicRules = [];
+
+let mutationTimer = null;
+const MUTATION_DEBOUNCE_MS = 75;
+
+const BUILTIN_STYLE_ID = 'adblock-builtin-cosmetics';
+const DYNAMIC_STYLE_ID = 'adblock-dynamic-cosmetics';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Settings / whitelist
+// ─────────────────────────────────────────────────────────────────────────────
+
+function domainMatches(entry) {
+  const domain = String(entry || '')
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .split('/')[0]
+    .replace(/^www\./, '');
+
+  if (!domain) return false;
+
+  return (
+    cleanHost === domain ||
+    cleanHost.endsWith('.' + domain)
+  );
+}
+
+function refreshProtectionState(items) {
+  if (items.settings) {
+    settings = {
+      ...DEFAULT_SETTINGS,
+      ...items.settings,
+    };
+  }
+
+  if (Array.isArray(items.whitelist)) {
+    whitelist = items.whitelist;
+  }
+
+  isWhitelisted = whitelist.some(domainMatches);
+
+  updateCosmeticStyles();
+  publishStreamingState();
+}
+
+function publishStreamingState() {
+  const enabled =
+    !isWhitelisted &&
+    settings.itvx !== false;
+
+  const apply = () => {
+    if (!document.documentElement) {
+      return false;
+    }
+
+    document.documentElement.dataset.adblockStreamingEnabled =
+      enabled ? '1' : '0';
+
+    document.dispatchEvent(
+      new CustomEvent('adblock-streaming-config', {
+        detail: { enabled },
+      })
+    );
+
+    return true;
+  };
+
+  if (!apply()) {
+    const timer = setInterval(() => {
+      if (apply()) {
+        clearInterval(timer);
+      }
+    }, 10);
+
+    setTimeout(() => clearInterval(timer), 2000);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Built-in cosmetic rules
+// ─────────────────────────────────────────────────────────────────────────────
+
 const cosmeticRules = {
-  // General - works across most sites
   '*': [
     '[id*="google_ads"]',
     '[id*="div-gpt-ad"]',
@@ -23,25 +119,43 @@ const cosmeticRules = {
     '.adsbygoogle',
   ],
 
-  // YouTube
   'youtube.com': [
     '.ytp-ad-module',
     '.ytp-ad-overlay-container',
     '.ytp-ad-text-overlay',
+
     '#masthead-ad',
-    '.ytd-display-ad-renderer',
-    'ytd-display-ad-renderer',
-    'ytd-promoted-sparkles-web-renderer',
-    'ytd-promoted-video-renderer',
-    'ytd-search-pyv-renderer',
-    'ytd-promoted-sparkles-text-search-renderer',
     '#player-ads',
-    '#panels > ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-ads"]',
+
     'ytd-ad-slot-renderer',
+    'ytd-display-ad-renderer',
+    'ytd-promoted-video-renderer',
+    'ytd-promoted-sparkles-web-renderer',
+    'ytd-promoted-sparkles-text-search-renderer',
+    'ytd-search-pyv-renderer',
+
+    '.ytd-display-ad-renderer',
     '.ytd-ad-slot-renderer',
+
+    '#panels > ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-ads"]',
+
+    /*
+     * Important:
+     *
+     * Hide the individual YouTube grid item containing an advertisement,
+     * rather than deleting the node from YouTube's DOM.
+     *
+     * Chrome supports :has(), so this collapses the empty grid position while
+     * leaving YouTube's internal SPA/infinite-scroll structure intact.
+     */
+    'ytd-rich-item-renderer:has(ytd-ad-slot-renderer)',
+    'ytd-rich-item-renderer:has(ytd-display-ad-renderer)',
+    'ytd-rich-item-renderer:has(ytd-promoted-video-renderer)',
+    'ytd-rich-item-renderer:has(ytd-promoted-sparkles-web-renderer)',
+    'ytd-rich-item-renderer:has(ytd-promoted-sparkles-text-search-renderer)',
+    'ytd-rich-item-renderer:has(ytd-search-pyv-renderer)',
   ],
 
-  // ITVX
   'itvx.co.uk': [
     '.advert',
     '.ad-break',
@@ -50,7 +164,6 @@ const cosmeticRules = {
     '.ima-ad-container',
   ],
 
-  // Channel 4
   'channel4.com': [
     '.ad-container',
     '.advert-container',
@@ -58,7 +171,6 @@ const cosmeticRules = {
     '.pre-roll',
   ],
 
-  // Daily Mail
   'dailymail.co.uk': [
     '.mol-ads',
     '.mol-ads-label',
@@ -68,7 +180,6 @@ const cosmeticRules = {
     '[class*="sponsored"]',
   ],
 
-  // The Sun
   'thesun.co.uk': [
     '.ad-container',
     '[class*="teads"]',
@@ -77,21 +188,18 @@ const cosmeticRules = {
     '[class*="commercial"]',
   ],
 
-  // Mirror
   'mirror.co.uk': [
     '.ad-unit',
     '[class*="advert"]',
     '[data-module="Advertisement"]',
   ],
 
-  // Metro
   'metro.co.uk': [
     '.ad-unit',
     '[class*="advert"]',
     '.commercial-feature',
   ],
 
-  // Independent
   'independent.co.uk': [
     '.ad-unit',
     '[class*="advert"]',
@@ -99,14 +207,12 @@ const cosmeticRules = {
     '.piano-inline-content',
   ],
 
-  // Sky News
   'skynews.com': [
     '.ad-container',
     '[class*="advert"]',
     '[id*="div-gpt"]',
   ],
 
-  // Reddit
   'reddit.com': [
     '[data-testid="promoted-post"]',
     'shreddit-ad-post',
@@ -114,7 +220,6 @@ const cosmeticRules = {
     '.promotedlink',
   ],
 
-  // Twitch
   'twitch.tv': [
     '.ad-banner-default',
     '[class*="ad-banner"]',
@@ -122,14 +227,12 @@ const cosmeticRules = {
     '.tw-ad',
   ],
 
-  // MSN
   'msn.com': [
     '[class*="ad-"]',
     '[id*="ad-"]',
     '.adunit',
   ],
 
-  // Yahoo
   'yahoo.com': [
     '[class*="ad-"]',
     '[id*="ad-"]',
@@ -137,21 +240,18 @@ const cosmeticRules = {
     '[data-ylk*="ad"]',
   ],
 
-  // GiveMeSport
   'givemesport.com': [
     '[class*="advert"]',
     '[id*="advert"]',
     '.ad-slot',
   ],
 
-  // Goal.com
   'goal.com': [
     '[class*="ad-"]',
     '[id*="ad-"]',
     '.advertisement',
   ],
 
-  // TalkSport
   'talksport.co.uk': [
     '.ad-unit',
     '[class*="advert"]',
@@ -159,135 +259,462 @@ const cosmeticRules = {
   ],
 };
 
-// ── Apply cosmetic filters ─────────────────────────────────────────────────
-function applyCosmetics() {
-  const selectors = [
-    ...(cosmeticRules['*'] || []),
-    ...(cosmeticRules[host] || []),
-    // Check parent domain
-    ...(cosmeticRules[host.replace(/^www\./, '')] || []),
-  ];
+const builtInSelectors = [
+  ...(cosmeticRules['*'] || []),
+  ...(cosmeticRules[host] || []),
+  ...(cosmeticRules[cleanHost] || []),
+];
 
-  if (selectors.length === 0) return;
+// ─────────────────────────────────────────────────────────────────────────────
+// CSS injection
+// ─────────────────────────────────────────────────────────────────────────────
 
-  let removed = 0;
-  selectors.forEach(sel => {
-    try {
-      document.querySelectorAll(sel).forEach(el => {
-        el.remove();
-        removed++;
-      });
-    } catch (e) {}
-  });
+function getOrCreateStyle(id) {
+  let style = document.getElementById(id);
 
-  if (removed > 0) {
-    chrome.runtime.sendMessage({ type: 'AD_BLOCKED', count: removed });
+  if (style) {
+    return style;
+  }
+
+  style = document.createElement('style');
+  style.id = id;
+  style.type = 'text/css';
+
+  const parent =
+    document.head ||
+    document.documentElement;
+
+  if (parent) {
+    parent.appendChild(style);
+  }
+
+  return style;
+}
+
+function selectorIsValid(selector) {
+  if (!selector) {
+    return false;
+  }
+
+  try {
+    document.querySelector(selector);
+    return true;
+  } catch {
+    return false;
   }
 }
 
-// ── YouTube ad skip ────────────────────────────────────────────────────────
-function skipYouTubeAd() {
-  if (!host.includes('youtube.com')) return;
+function selectorsToCSS(selectors) {
+  const uniqueSelectors = [
+    ...new Set(
+      selectors
+        .filter(Boolean)
+        .filter(selectorIsValid)
+    ),
+  ];
 
-  // Click skip button if present
-  const skipBtn = document.querySelector('.ytp-skip-ad-button, .ytp-ad-skip-button');
-  if (skipBtn) {
-    skipBtn.click();
-    chrome.runtime.sendMessage({ type: 'AD_STRIPPED', count: 1 });
+  if (uniqueSelectors.length === 0) {
+    return '';
+  }
+
+  /*
+   * One grouped rule is substantially cheaper than creating a separate
+   * <style> entry for every selector.
+   */
+  return `
+${uniqueSelectors.join(',\n')} {
+  display: none !important;
+  visibility: hidden !important;
+}
+`;
+}
+
+function updateBuiltInCosmeticStyle() {
+  const style = getOrCreateStyle(BUILTIN_STYLE_ID);
+
+  if (!style) {
     return;
   }
 
-  // If an ad is playing, mute and fast-forward it
-  const video = document.querySelector('video');
-  const adBadge = document.querySelector('.ad-showing');
-  if (video && adBadge) {
+  if (
+    isWhitelisted ||
+    settings.cosmetic === false
+  ) {
+    style.textContent = '';
+    return;
+  }
+
+  style.textContent =
+    selectorsToCSS(builtInSelectors);
+}
+
+function updateDynamicCosmeticStyle() {
+  const style = getOrCreateStyle(DYNAMIC_STYLE_ID);
+
+  if (!style) {
+    return;
+  }
+
+  if (
+    isWhitelisted ||
+    settings.cosmetic === false
+  ) {
+    style.textContent = '';
+    return;
+  }
+
+  const selectors =
+    applicableDynamicRules.map(
+      rule => rule.selector
+    );
+
+  style.textContent =
+    selectorsToCSS(selectors);
+}
+
+function updateCosmeticStyles() {
+  updateBuiltInCosmeticStyle();
+  updateDynamicCosmeticStyle();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dynamic filter-list cosmetics
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ruleAppliesToCurrentHost(rule) {
+  if (!rule || !rule.selector) {
+    return false;
+  }
+
+  if (
+    !rule.domains ||
+    rule.domains.length === 0
+  ) {
+    return true;
+  }
+
+  return rule.domains.some((d) => {
+    const cleanD = String(d || '')
+      .toLowerCase()
+      .replace(/^www\./, '');
+
+    return (
+      cleanD === '*' ||
+      cleanHost === cleanD ||
+      cleanHost.endsWith('.' + cleanD)
+    );
+  });
+}
+
+function rebuildApplicableDynamicRules() {
+  applicableDynamicRules =
+    dynamicCosmeticRules.filter((rule) => {
+      /*
+       * Cosmetic exception support (#@#) is still a separate upcoming fix.
+       * Preserve the existing behaviour for now.
+       */
+      if (rule.isException) {
+        return false;
+      }
+
+      return ruleAppliesToCurrentHost(rule);
+    });
+
+  updateDynamicCosmeticStyle();
+}
+
+async function refreshDynamicCosmeticCache() {
+  try {
+    const items =
+      await chrome.storage.local.get(null);
+
+    const rules = [];
+
+    for (
+      const [key, value]
+      of Object.entries(items)
+    ) {
+      if (
+        key.startsWith('cosmetic_') &&
+        Array.isArray(value)
+      ) {
+        rules.push(...value);
+      }
+    }
+
+    dynamicCosmeticRules = rules;
+
+    rebuildApplicableDynamicRules();
+  } catch (err) {
+    console.error(
+      '[adblock] Failed to refresh cosmetic cache:',
+      err
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// YouTube procedural behaviour
+// ─────────────────────────────────────────────────────────────────────────────
+
+function skipYouTubeAd() {
+  if (
+    isWhitelisted ||
+    settings.youtube === false
+  ) {
+    return;
+  }
+
+  if (!host.includes('youtube.com')) {
+    return;
+  }
+
+  const skipButton =
+    document.querySelector(
+      '.ytp-skip-ad-button, .ytp-ad-skip-button'
+    );
+
+  if (skipButton) {
+    skipButton.click();
+
+    chrome.runtime.sendMessage({
+      type: 'AD_STRIPPED',
+      count: 1,
+    });
+
+    return;
+  }
+
+  const video =
+    document.querySelector('video');
+
+  const adShowing =
+    document.querySelector('.ad-showing');
+
+  if (
+    video &&
+    adShowing
+  ) {
     video.muted = true;
-    if (video.duration && isFinite(video.duration)) {
-      video.currentTime = video.duration;
+
+    if (
+      video.duration &&
+      isFinite(video.duration)
+    ) {
+      video.currentTime =
+        video.duration;
     }
   }
 }
 
-// ── ITVX ad skip ──────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// ITVX procedural behaviour
+// ─────────────────────────────────────────────────────────────────────────────
+
 function skipITVXAd() {
-  if (!host.includes('itvx.co.uk') && !host.includes('itv.com')) return;
+  if (
+    isWhitelisted ||
+    settings.itvx === false
+  ) {
+    return;
+  }
 
-  const videos = document.querySelectorAll('video');
-  if (videos.length < 4) return;
+  if (
+    !host.includes('itvx.co.uk') &&
+    !host.includes('itv.com')
+  ) {
+    return;
+  }
 
-  // Video index 3 is the ad player on ITVX
-  // Also scan all videos for one that looks like an ad (short, playing, in fe-mrphs__videoParent)
-  videos.forEach((v, i) => {
-    if (v.paused) return;
-    if (!v.duration || v.duration > 120) return; // Ads are under 2 mins
+  const videos =
+    document.querySelectorAll('video');
 
-    const parent = v.closest('[class]');
-    const isAdContainer = parent && (
-      parent.className.includes('videoParent') ||
-      parent.className.includes('ad') ||
-      i === 3
+  if (videos.length < 4) {
+    return;
+  }
+
+  videos.forEach((video, index) => {
+    if (video.paused) {
+      return;
+    }
+
+    if (
+      !video.duration ||
+      video.duration > 120
+    ) {
+      return;
+    }
+
+    const parent =
+      video.closest('[class]');
+
+    const parentClass =
+      parent
+        ? String(parent.className)
+        : '';
+
+    const isAdContainer =
+      parent &&
+      (
+        parentClass.includes('videoParent') ||
+        parentClass.includes('ad') ||
+        index === 3
+      );
+
+    if (!isAdContainer) {
+      return;
+    }
+
+    video.dispatchEvent(
+      new Event('ended', {
+        bubbles: true,
+      })
     );
 
-    if (isAdContainer) {
-      // Dispatch fake ended event to trick player into moving past the ad
-      v.dispatchEvent(new Event('ended', { bubbles: true }));
-      chrome.runtime.sendMessage({ type: 'AD_STRIPPED', count: 1 });
-    }
-  });
-}
-
-// ── MutationObserver - handles dynamically loaded content ──────────────────
-const observer = new MutationObserver(() => {
-  applyCosmetics();
-  skipYouTubeAd();
-});
-
-observer.observe(document.documentElement, {
-  childList: true,
-  subtree: true,
-});
-
-// Run immediately and on load
-applyCosmetics();
-document.addEventListener('DOMContentLoaded', applyCosmetics);
-
-if (host.includes('youtube.com')) {
-  setInterval(skipYouTubeAd, 300);
-}
-
-// ── Dynamic cosmetic filters from storage ─────────────────────────────────
-function applyDynamicCosmetics() {
-  chrome.storage.local.get(null, (items) => {
-    // Find all cosmetic_* keys (from filter lists and custom filters)
-    const allCosmetic = [];
-    for (const [key, val] of Object.entries(items)) {
-      if (key.startsWith('cosmetic_') && Array.isArray(val)) {
-        allCosmetic.push(...val);
-      }
-    }
-
-    allCosmetic.forEach(rule => {
-      if (rule.isException) return;
-      // Check if rule applies to this host
-      const cleanHost = host.replace(/^www\./, '');
-      const applies = !rule.domains || rule.domains.length === 0 ||
-        rule.domains.some(d => {
-          const cleanD = d.replace(/^www\./, '');
-          return cleanHost === cleanD || cleanHost.endsWith('.' + cleanD) || d === '*';
-        });
-      if (!applies) return;
-
-      try {
-        document.querySelectorAll(rule.selector).forEach(el => el.remove());
-      } catch(e) {}
+    chrome.runtime.sendMessage({
+      type: 'AD_STRIPPED',
+      count: 1,
     });
   });
 }
 
-applyDynamicCosmetics();
+// ─────────────────────────────────────────────────────────────────────────────
+// Procedural pass
+// ─────────────────────────────────────────────────────────────────────────────
 
-// Also re-apply when DOM changes
-const dynamicObserver = new MutationObserver(() => applyDynamicCosmetics());
-dynamicObserver.observe(document.documentElement, { childList: true, subtree: true });
+function runProceduralLogic() {
+  if (isWhitelisted) {
+    return;
+  }
 
-console.log('[adblock] Content script active on', host);
+  if (
+    settings.youtube !== false &&
+    host.includes('youtube.com')
+  ) {
+    skipYouTubeAd();
+  }
+
+  if (
+    settings.itvx !== false &&
+    (
+      host.includes('itvx.co.uk') ||
+      host.includes('itv.com')
+    )
+  ) {
+    skipITVXAd();
+  }
+}
+
+function scheduleProceduralPass() {
+  if (mutationTimer !== null) {
+    return;
+  }
+
+  mutationTimer = setTimeout(() => {
+    mutationTimer = null;
+    runProceduralLogic();
+  }, MUTATION_DEBOUNCE_MS);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Initialisation
+// ─────────────────────────────────────────────────────────────────────────────
+
+chrome.storage.local.get(
+  ['settings', 'whitelist'],
+  async (items) => {
+    refreshProtectionState(items);
+
+    await refreshDynamicCosmeticCache();
+
+    updateCosmeticStyles();
+    runProceduralLogic();
+  }
+);
+
+chrome.storage.onChanged.addListener(
+  (changes, area) => {
+    if (area !== 'local') {
+      return;
+    }
+
+    const update = {};
+
+    if (changes.settings) {
+      update.settings =
+        changes.settings.newValue || {};
+    }
+
+    if (changes.whitelist) {
+      update.whitelist =
+        changes.whitelist.newValue || [];
+    }
+
+    if (
+      'settings' in update ||
+      'whitelist' in update
+    ) {
+      refreshProtectionState(update);
+      runProceduralLogic();
+    }
+
+    const cosmeticsChanged =
+      Object.keys(changes).some(
+        key => key.startsWith('cosmetic_')
+      );
+
+    if (cosmeticsChanged) {
+      refreshDynamicCosmeticCache();
+    }
+  }
+);
+
+// Install cosmetic CSS as early as possible.
+// Settings loading immediately replaces/clears it if required.
+updateBuiltInCosmeticStyle();
+
+// Mutation observation now exists ONLY for procedural functionality.
+// Cosmetic filtering itself does not depend on MutationObserver anymore.
+if (
+  host.includes('youtube.com') ||
+  host.includes('itvx.co.uk') ||
+  host.includes('itv.com')
+) {
+  const observer =
+    new MutationObserver(
+      scheduleProceduralPass
+    );
+
+  observer.observe(
+    document.documentElement,
+    {
+      childList: true,
+      subtree: true,
+    }
+  );
+}
+
+document.addEventListener(
+  'DOMContentLoaded',
+  () => {
+    updateCosmeticStyles();
+    runProceduralLogic();
+  }
+);
+
+// Preserve the fast YouTube Skip button check.
+if (host.includes('youtube.com')) {
+  setInterval(() => {
+    if (
+      !isWhitelisted &&
+      settings.youtube !== false
+    ) {
+      skipYouTubeAd();
+    }
+  }, 300);
+}
+
+console.log(
+  '[adblock] CSS cosmetic engine active on',
+  host
+);
