@@ -3,7 +3,6 @@
   "name": "Adblock",
   "version": "2.0.0",
   "description": "Custom ad blocker. DNS + request blocking + cosmetic filtering + uBlock filter compatibility.",
-
   "permissions": [
     "declarativeNetRequest",
     "declarativeNetRequestWithHostAccess",
@@ -14,37 +13,45 @@
     "activeTab",
     "alarms"
   ],
-
   "host_permissions": [
     "<all_urls>"
   ],
-
   "background": {
     "service_worker": "background.js"
   },
-
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_start"
     },
     {
-      "matches": ["<all_urls>"],
-      "js": ["itvx-inject.js"],
+      "matches": [
+        "*://*.itv.com/*",
+        "*://*.channel4.com/*"
+      ],
+      "js": [
+        "itvx-inject.js"
+      ],
       "run_at": "document_start",
       "world": "MAIN",
-      "all_frames": true,
-      "exclude_matches": [
-        "*://accounts.google.com/*",
-        "*://ogs.google.com/*",
-        "*://www.google.com/*",
-        "*://mail.google.com/*",
-        "*://drive.google.com/*"
-      ]
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "https://*.netflix.com/*"
+      ],
+      "js": [
+        "netflix-inject.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
     }
   ],
-
   "declarative_net_request": {
     "rule_resources": [
       {
@@ -64,7 +71,6 @@
       }
     ]
   },
-
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
@@ -74,16 +80,19 @@
       "128": "icons/icon128.png"
     }
   },
-
   "options_page": "dashboard.html",
-
   "web_accessible_resources": [
     {
-      "resources": ["empty.xml", "empty.js", "itvx-inject.js"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "empty.xml",
+        "empty.js",
+        "itvx-inject.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ],
-
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",

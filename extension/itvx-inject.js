@@ -1,6 +1,12 @@
 (function() {
   'use strict';
 
+  const CURRENT_HOST = location.hostname.toLowerCase();
+  const IS_ITV = CURRENT_HOST === 'itv.com' || CURRENT_HOST.endsWith('.itv.com');
+  const IS_CHANNEL4 = CURRENT_HOST === 'channel4.com' || CURRENT_HOST.endsWith('.channel4.com');
+  console.log('[adblock/streaming] injector active:', CURRENT_HOST,
+    IS_ITV ? '(ITV/ITVX)' : IS_CHANNEL4 ? '(Channel 4)' : '(other)');
+
   // ── ITVX ad detection neutraliser ───────────────────────────────────────
   const _fetch = window.fetch;
   window.fetch = function(...args) {
