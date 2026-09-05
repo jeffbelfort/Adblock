@@ -2,7 +2,7 @@
 # Run as Administrator
 
 $ErrorActionPreference = "Stop"
-$dir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$installDir = Join-Path $env:ProgramFiles "Adblock\dns"
 
 Write-Host ""
 Write-Host "=== AdblockDNS Uninstaller ===" -ForegroundColor Cyan
@@ -14,28 +14,29 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
     exit 1
 }
 
-$exe = Join-Path $dir "AdblockDNS.exe"
-
-# Stop and uninstall service
-Write-Host "Stopping service..." -ForegroundColor Yellow
-try { & $exe stop 2>$null } catch {}
-Start-Sleep -Seconds 1
-
-Write-Host "Uninstalling service..." -ForegroundColor Yellow
-try {
-    & $exe uninstall
+Write-Host "Stopping/removing service..." -ForegroundColor Yellow
+$service = Get-Service -Name "AdblockDNS" -ErrorAction SilentlyContinue
+if ($service) {
+    if ($service.Status -ne "Stopped") {
+        sc.exe stop AdblockDNS | Out-Null
+        Start-Sleep -Seconds 1
+    }
+    sc.exe delete AdblockDNS | Out-Null
     Write-Host "  OK" -ForegroundColor Green
-} catch {
-    Write-Host "  Service not found (already removed)" -ForegroundColor Yellow
+} else {
+    Write-Host "  Service already removed" -ForegroundColor DarkYellow
 }
 
-# Re-enable Windows DNS cache
+if (Test-Path $installDir) {
+    Remove-Item $installDir -Recurse -Force
+}
+
 Write-Host "Restoring Windows DNS cache service..." -ForegroundColor Yellow
 Set-Service -Name "Dnscache" -StartupType Automatic
-Start-Service -Name "Dnscache"
+Start-Service -Name "Dnscache" -ErrorAction SilentlyContinue
 Write-Host "  OK" -ForegroundColor Green
 
 Write-Host ""
-Write-Host "Done. Remember to set your DNS back to Automatic in network settings." -ForegroundColor Cyan
+Write-Host "Done. Remember to set your DNS back to Automatic if needed." -ForegroundColor Cyan
 Write-Host ""
 pause
