@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -16,6 +17,8 @@ import (
 	"strings"
 	"time"
 )
+
+const maxAddDomainRequestBytes = 4096
 
 var dnsLogPath string
 var dnsBlocklistDir string
@@ -203,24 +206,29 @@ func handleDNSStop(w http.ResponseWriter, r *http.Request) {
 // handleDNSLogs returns recent unique blocked domains
 func handleDNSLogs(w http.ResponseWriter, r *http.Request) {
 	entries := getBlockedEntries(500)
+
 	// Deduplicate: keep only most recent occurrence of each domain per minute
 	seen := make(map[string]bool)
 	var deduped []map[string]string
+
 	for i := len(entries) - 1; i >= 0; i-- {
 		e := entries[i]
-		key := e["domain"] + "|" + e["time"][:13] // domain + hour:minute
+		key := e["domain"] + "|" + e["time"][:13]
+
 		if !seen[key] {
 			seen[key] = true
 			deduped = append([]map[string]string{e}, deduped...)
 		}
 	}
-	// Return last 100
+
 	if len(deduped) > 100 {
 		deduped = deduped[len(deduped)-100:]
 	}
+
 	if deduped == nil {
 		deduped = []map[string]string{}
 	}
+
 	writeJSON(w, deduped)
 }
 
@@ -228,7 +236,6 @@ func handleDNSLogs(w http.ResponseWriter, r *http.Request) {
 func handleDNSHistory(w http.ResponseWriter, r *http.Request) {
 	entries := getBlockedEntries(5000)
 
-	// Count by domain
 	domainCount := make(map[string]int)
 	for _, e := range entries {
 		domainCount[e["domain"]]++
@@ -238,10 +245,15 @@ func handleDNSHistory(w http.ResponseWriter, r *http.Request) {
 		Domain string `json:"domain"`
 		Count  int    `json:"count"`
 	}
+
 	var stats []domainStat
 	for d, c := range domainCount {
-		stats = append(stats, domainStat{Domain: d, Count: c})
+		stats = append(stats, domainStat{
+			Domain: d,
+			Count:  c,
+		})
 	}
+
 	sort.Slice(stats, func(i, j int) bool {
 		return stats[i].Count > stats[j].Count
 	})
@@ -256,7 +268,6 @@ func handleDNSHistory(w http.ResponseWriter, r *http.Request) {
 func handleDNSGraph(w http.ResponseWriter, r *http.Request) {
 	entries := getBlockedEntries(10000)
 
-	// Count blocks per hour for last 24 hours
 	now := time.Now()
 	hours := make(map[string]int)
 	labels := make([]string, 24)
@@ -271,7 +282,6 @@ func handleDNSGraph(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, e := range entries {
-		// e["time"] format: "2006/01/02 15:04:05"
 		if len(e["time"]) >= 13 {
 			key := e["time"][:13]
 			if _, ok := hours[key]; ok {
@@ -298,54 +308,190 @@ func handleBlocklists(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, []interface{}{})
 		return
 	}
+
 	var lists []map[string]interface{}
+
 	for _, f := range files {
 		count := countDomainsInFile(f)
+
 		lists = append(lists, map[string]interface{}{
 			"name":  filepath.Base(f),
 			"count": count,
 		})
 	}
+
 	if lists == nil {
 		lists = []map[string]interface{}{}
 	}
+
 	writeJSON(w, lists)
 }
 
 func handleAddDomain(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
+	if r.Method != http.MethodPost {
 		http.Error(w, "POST only", http.StatusMethodNotAllowed)
 		return
 	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxAddDomainRequestBytes)
+	defer r.Body.Close()
+
 	var body struct {
 		Domain string `json:"domain"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeJSON(w, map[string]interface{}{"ok": false, "error": "invalid JSON"})
+
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+
+	if err := decoder.Decode(&body); err != nil {
+		if strings.Contains(err.Error(), "request body too large") {
+			writeJSON(w, map[string]interface{}{
+				"ok":    false,
+				"error": "request too large",
+			})
+			return
+		}
+
+		writeJSON(w, map[string]interface{}{
+			"ok":    false,
+			"error": "invalid JSON",
+		})
 		return
 	}
+
+	if err := ensureJSONEOF(decoder); err != nil {
+		writeJSON(w, map[string]interface{}{
+			"ok":    false,
+			"error": "invalid JSON",
+		})
+		return
+	}
+
 	domain := strings.TrimSpace(strings.ToLower(body.Domain))
+
 	if domain == "" {
-		writeJSON(w, map[string]interface{}{"ok": false, "error": "empty domain"})
+		writeJSON(w, map[string]interface{}{
+			"ok":    false,
+			"error": "empty domain",
+		})
 		return
 	}
+
+	if containsControlCharacter(domain) {
+		writeJSON(w, map[string]interface{}{
+			"ok":    false,
+			"error": "invalid domain",
+		})
+		return
+	}
+
+	if !isValidHostname(domain) {
+		writeJSON(w, map[string]interface{}{
+			"ok":    false,
+			"error": "invalid domain",
+		})
+		return
+	}
+
 	customPath := filepath.Join(dnsBlocklistDir, "custom.txt")
-	f, err := os.OpenFile(customPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+
+	f, err := os.OpenFile(
+		customPath,
+		os.O_CREATE|os.O_APPEND|os.O_WRONLY,
+		0644,
+	)
 	if err != nil {
-		writeJSON(w, map[string]interface{}{"ok": false, "error": err.Error()})
+		writeJSON(w, map[string]interface{}{
+			"ok":    false,
+			"error": err.Error(),
+		})
 		return
 	}
 	defer f.Close()
-	fmt.Fprintf(f, "%s\n", domain)
-	writeJSON(w, map[string]interface{}{"ok": true, "domain": domain})
+
+	if _, err := fmt.Fprintf(f, "%s\n", domain); err != nil {
+		writeJSON(w, map[string]interface{}{
+			"ok":    false,
+			"error": err.Error(),
+		})
+		return
+	}
+
+	writeJSON(w, map[string]interface{}{
+		"ok":     true,
+		"domain": domain,
+	})
+}
+
+func ensureJSONEOF(decoder *json.Decoder) error {
+	var extra interface{}
+
+	err := decoder.Decode(&extra)
+	if err == io.EOF {
+		return nil
+	}
+
+	if err == nil {
+		return fmt.Errorf("unexpected trailing JSON")
+	}
+
+	return err
+}
+
+func containsControlCharacter(value string) bool {
+	for _, r := range value {
+		if r < 0x20 || r == 0x7f {
+			return true
+		}
+	}
+
+	return false
+}
+
+func isValidHostname(hostname string) bool {
+	if len(hostname) == 0 || len(hostname) > 253 {
+		return false
+	}
+
+	if strings.HasPrefix(hostname, ".") ||
+		strings.HasSuffix(hostname, ".") ||
+		strings.Contains(hostname, "..") {
+		return false
+	}
+
+	labels := strings.Split(hostname, ".")
+
+	for _, label := range labels {
+		if len(label) == 0 || len(label) > 63 {
+			return false
+		}
+
+		if label[0] == '-' || label[len(label)-1] == '-' {
+			return false
+		}
+
+		for _, r := range label {
+			isLetter := r >= 'a' && r <= 'z'
+			isDigit := r >= '0' && r <= '9'
+
+			if !isLetter && !isDigit && r != '-' {
+				return false
+			}
+		}
+	}
+
+	return true
 }
 
 func getBlockedEntries(maxLines int) []map[string]string {
 	lines := readLastNLines(dnsLogPath, maxLines)
+
 	var entries []map[string]string
+
 	for _, line := range lines {
 		if strings.Contains(line, "[BLOCKED]") {
 			parts := strings.SplitN(line, "[BLOCKED] ", 2)
+
 			if len(parts) == 2 {
 				entries = append(entries, map[string]string{
 					"domain": strings.TrimSpace(parts[1]),
@@ -354,27 +500,33 @@ func getBlockedEntries(maxLines int) []map[string]string {
 			}
 		}
 	}
+
 	return entries
 }
 
 func isDNSRunning() bool {
 	cmd := exec.Command("sc", "query", "AdblockDNS")
+
 	out, err := cmd.Output()
 	if err != nil {
 		return false
 	}
+
 	return strings.Contains(string(out), "RUNNING")
 }
 
 func countBlockedToday() int {
 	today := time.Now().Format("2006/01/02")
 	entries := getBlockedEntries(10000)
+
 	count := 0
+
 	for _, e := range entries {
 		if strings.HasPrefix(e["time"], today) {
 			count++
 		}
 	}
+
 	return count
 }
 
@@ -383,24 +535,32 @@ func countBlockedTotal() int {
 }
 
 func countLoadedDomains() int {
-	// Scan entire log file for last "Loaded X blocked domains" line
 	f, err := os.Open(dnsLogPath)
 	if err != nil {
 		return 0
 	}
 	defer f.Close()
+
 	result := 0
+
 	scanner := bufio.NewScanner(f)
 	buf := make([]byte, 10*1024*1024)
 	scanner.Buffer(buf, len(buf))
+
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.Contains(line, "blocked domains") && strings.Contains(line, "Loaded") {
+
+		if strings.Contains(line, "blocked domains") &&
+			strings.Contains(line, "Loaded") {
+
 			fields := strings.Fields(line)
+
 			for j, field := range fields {
 				if field == "Loaded" && j+1 < len(fields) {
 					var n int
+
 					fmt.Sscanf(fields[j+1], "%d", &n)
+
 					if n > 0 {
 						result = n
 					}
@@ -408,6 +568,7 @@ func countLoadedDomains() int {
 			}
 		}
 	}
+
 	return result
 }
 
@@ -417,16 +578,21 @@ func countDomainsInFile(path string) int {
 		return 0
 	}
 	defer f.Close()
+
 	count := 0
+
 	scanner := bufio.NewScanner(f)
 	buf := make([]byte, 10*1024*1024)
 	scanner.Buffer(buf, len(buf))
+
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
+
 		if line != "" && !strings.HasPrefix(line, "#") {
 			count++
 		}
 	}
+
 	return count
 }
 
@@ -436,15 +602,20 @@ func readLastNLines(path string, n int) []string {
 		return nil
 	}
 	defer f.Close()
+
 	var lines []string
+
 	scanner := bufio.NewScanner(f)
 	buf := make([]byte, 10*1024*1024)
 	scanner.Buffer(buf, len(buf))
+
 	for scanner.Scan() {
 		lines = append(lines, scanner.Text())
 	}
+
 	if len(lines) <= n {
 		return lines
 	}
+
 	return lines[len(lines)-n:]
 }
