@@ -405,7 +405,8 @@ canvas#graph { display: block; width: 100%; height: 180px; }
 <div class="toast" id="toast"></div>
 
 <script>
-const API = 'http://localhost:9001/api';
+const API = '/api';
+const API_TOKEN = '__ADBLOCK_API_TOKEN__';
 let graphData = { labels: [], values: [] };
 
 // ── Page routing ───────────────────────────────────
@@ -601,7 +602,7 @@ async function fetchHistory() {
 // ── DNS controls ───────────────────────────────────
 async function startDNS() {
   try {
-    const r = await fetch(API + '/dns/start', { method: 'POST' });
+    const r = await fetch(API + '/dns/start', { method: 'POST', headers: { 'X-Adblock-Token': API_TOKEN } });
     const d = await r.json();
     if (d.ok) { showToast('DNS layer started'); fetchStatus(); }
     else showToast('Failed: ' + d.error, true);
@@ -610,7 +611,7 @@ async function startDNS() {
 
 async function stopDNS() {
   try {
-    const r = await fetch(API + '/dns/stop', { method: 'POST' });
+    const r = await fetch(API + '/dns/stop', { method: 'POST', headers: { 'X-Adblock-Token': API_TOKEN } });
     const d = await r.json();
     if (d.ok) { showToast('DNS layer stopped'); fetchStatus(); }
     else showToast('Failed: ' + d.error, true);
@@ -624,7 +625,7 @@ async function addDomain() {
   try {
     const r = await fetch(API + '/blocklists/add', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Adblock-Token': API_TOKEN },
       body: JSON.stringify({ domain })
     });
     const d = await r.json();

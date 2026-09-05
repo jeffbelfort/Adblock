@@ -2,6 +2,9 @@ package main
 
 import (
 	"bufio"
+	"crypto/rand"
+	"crypto/subtle"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -17,16 +20,25 @@ import (
 var dnsLogPath string
 var dnsBlocklistDir string
 var dnsBinaryPath string
+var dashboardAPIToken string
 
 func runDashboard() {
 	setupPaths()
 	setupLogging()
+	dashboardAPIToken = newDashboardAPIToken()
 
 	log.Println("[adblock-dashboard] Starting on http://localhost:9001")
 
 	mux := http.NewServeMux()
 	webDir := filepath.Join(exeDir(), "web")
-	mux.Handle("/", http.FileServer(http.Dir(webDir)))
+	fileServer := http.FileServer(http.Dir(webDir))
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
+			serveDashboardIndex(w, r, webDir)
+			return
+		}
+		fileServer.ServeHTTP(w, r)
+	})
 
 	mux.HandleFunc("/api/status", handleStatus)
 	mux.HandleFunc("/api/dns/start", handleDNSStart)
@@ -39,7 +51,7 @@ func runDashboard() {
 
 	srv := &http.Server{
 		Addr:    "127.0.0.1:9001",
-		Handler: corsMiddleware(mux),
+		Handler: dashboardSecurityMiddleware(mux),
 	}
 
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -86,15 +98,58 @@ func setupLogging() {
 	log.SetFlags(log.Ldate | log.Ltime)
 }
 
-func corsMiddleware(next http.Handler) http.Handler {
+func newDashboardAPIToken() string {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		log.Fatalf("[adblock-dashboard] Could not generate API token: %v", err)
+	}
+	return hex.EncodeToString(b)
+}
+
+func serveDashboardIndex(w http.ResponseWriter, r *http.Request, webDir string) {
+	indexPath := filepath.Join(webDir, "index.html")
+	data, err := os.ReadFile(indexPath)
+	if err != nil {
+		http.Error(w, "dashboard unavailable", http.StatusInternalServerError)
+		return
+	}
+	page := strings.ReplaceAll(string(data), "__ADBLOCK_API_TOKEN__", dashboardAPIToken)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write([]byte(page))
+}
+
+func dashboardSecurityMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "no-referrer")
+
+		host := strings.ToLower(r.Host)
+		if host != "localhost:9001" && host != "127.0.0.1:9001" {
+			http.Error(w, "invalid host", http.StatusForbidden)
 			return
 		}
+
+		origin := strings.ToLower(r.Header.Get("Origin"))
+		if origin != "" && origin != "http://localhost:9001" && origin != "http://127.0.0.1:9001" {
+			http.Error(w, "cross-origin request denied", http.StatusForbidden)
+			return
+		}
+
+		if r.Method == http.MethodOptions {
+			http.Error(w, "cross-origin requests are not supported", http.StatusForbidden)
+			return
+		}
+
+		if r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/api/") {
+			provided := r.Header.Get("X-Adblock-Token")
+			if len(provided) != len(dashboardAPIToken) || subtle.ConstantTimeCompare([]byte(provided), []byte(dashboardAPIToken)) != 1 {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+		}
+
 		next.ServeHTTP(w, r)
 	})
 }
@@ -111,11 +166,11 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 	domainCount := countLoadedDomains()
 
 	writeJSON(w, map[string]interface{}{
-		"dns_running":    dnsRunning,
-		"blocked_today":  blockedToday,
-		"blocked_total":  blockedTotal,
-		"domain_count":   domainCount,
-		"timestamp":      time.Now().Unix(),
+		"dns_running":   dnsRunning,
+		"blocked_today": blockedToday,
+		"blocked_total": blockedTotal,
+		"domain_count":  domainCount,
+		"timestamp":     time.Now().Unix(),
 	})
 }
 
