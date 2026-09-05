@@ -20,6 +20,7 @@ let isWhitelisted = false;
 
 let dynamicCosmeticRules = [];
 let applicableDynamicRules = [];
+let applicableCosmeticExceptionSelectors = new Set();
 
 let mutationTimer = null;
 const MUTATION_DEBOUNCE_MS = 75;
@@ -139,15 +140,6 @@ const cosmeticRules = {
 
     '#panels > ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-ads"]',
 
-    /*
-     * Important:
-     *
-     * Hide the individual YouTube grid item containing an advertisement,
-     * rather than deleting the node from YouTube's DOM.
-     *
-     * Chrome supports :has(), so this collapses the empty grid position while
-     * leaving YouTube's internal SPA/infinite-scroll structure intact.
-     */
     'ytd-rich-item-renderer:has(ytd-ad-slot-renderer)',
     'ytd-rich-item-renderer:has(ytd-display-ad-renderer)',
     'ytd-rich-item-renderer:has(ytd-promoted-video-renderer)',
@@ -317,10 +309,6 @@ function selectorsToCSS(selectors) {
     return '';
   }
 
-  /*
-   * One grouped rule is substantially cheaper than creating a separate
-   * <style> entry for every selector.
-   */
   return `
 ${uniqueSelectors.join(',\n')} {
   display: none !important;
@@ -344,8 +332,13 @@ function updateBuiltInCosmeticStyle() {
     return;
   }
 
+  const selectors = builtInSelectors.filter(
+    selector =>
+      !applicableCosmeticExceptionSelectors.has(selector)
+  );
+
   style.textContent =
-    selectorsToCSS(builtInSelectors);
+    selectorsToCSS(selectors);
 }
 
 function updateDynamicCosmeticStyle() {
@@ -407,20 +400,43 @@ function ruleAppliesToCurrentHost(rule) {
 }
 
 function rebuildApplicableDynamicRules() {
+  const applicableRules =
+    dynamicCosmeticRules.filter(
+      rule => ruleAppliesToCurrentHost(rule)
+    );
+
+  /*
+   * #@# cosmetic exceptions.
+   *
+   * If an exception applies to this hostname, its selector cancels any
+   * matching cosmetic hide rule on this page regardless of which subscribed
+   * list supplied the hide rule.
+   *
+   * Example:
+   *
+   *   ##.advert
+   *   example.com#@#.advert
+   *
+   * ".advert" remains visible on example.com.
+   */
+  applicableCosmeticExceptionSelectors =
+    new Set(
+      applicableRules
+        .filter(rule => rule.isException)
+        .map(rule => rule.selector)
+        .filter(Boolean)
+    );
+
   applicableDynamicRules =
-    dynamicCosmeticRules.filter((rule) => {
-      /*
-       * Cosmetic exception support (#@#) is still a separate upcoming fix.
-       * Preserve the existing behaviour for now.
-       */
-      if (rule.isException) {
-        return false;
-      }
+    applicableRules.filter(
+      rule =>
+        !rule.isException &&
+        !applicableCosmeticExceptionSelectors.has(
+          rule.selector
+        )
+    );
 
-      return ruleAppliesToCurrentHost(rule);
-    });
-
-  updateDynamicCosmeticStyle();
+  updateCosmeticStyles();
 }
 
 async function refreshDynamicCosmeticCache() {
