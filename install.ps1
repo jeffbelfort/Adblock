@@ -220,7 +220,7 @@ Write-Host "  OK - local resolver verified healthy" -ForegroundColor Green
 $adapters = Get-NetAdapter | Where-Object { $_.Status -eq "Up" -and $_.InterfaceDescription -notlike "*Loopback*" -and $_.InterfaceDescription -notlike "*WireGuard*" }
 foreach ($adapter in $adapters) {
     try {
-        Set-DnsClientServerAddress -InterfaceAlias $adapter.Name -ServerAddresses ("127.0.0.1", "1.1.1.1")
+        Set-DnsClientServerAddress -InterfaceAlias $adapter.Name -ServerAddresses "127.0.0.1"
         Write-Host "  OK - DNS set on $($adapter.Name)" -ForegroundColor Green
     } catch {
         Write-Host "  Skipped $($adapter.Name): $_" -ForegroundColor Yellow
