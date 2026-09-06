@@ -31,6 +31,17 @@
     },
     {
       "matches": [
+        "https://*.youtube.com/*",
+        "https://youtube.com/*"
+      ],
+      "js": [
+        "youtube-inject.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
         "*://*.itv.com/*",
         "*://*.channel4.com/*"
       ],

@@ -63,6 +63,40 @@ function refreshProtectionState(items) {
 
   updateCosmeticStyles();
   publishStreamingState();
+  publishYouTubeState();
+}
+
+function publishYouTubeState() {
+  const enabled =
+    !isWhitelisted &&
+    settings.youtube !== false;
+
+  const apply = () => {
+    if (!document.documentElement) {
+      return false;
+    }
+
+    document.documentElement.dataset.adblockYoutubeEnabled =
+      enabled ? '1' : '0';
+
+    document.dispatchEvent(
+      new CustomEvent('adblock-youtube-config', {
+        detail: { enabled },
+      })
+    );
+
+    return true;
+  };
+
+  if (!apply()) {
+    const timer = setInterval(() => {
+      if (apply()) {
+        clearInterval(timer);
+      }
+    }, 10);
+
+    setTimeout(() => clearInterval(timer), 2000);
+  }
 }
 
 function publishStreamingState() {
