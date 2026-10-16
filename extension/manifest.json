@@ -57,6 +57,15 @@
         "https://*.netflix.com/*"
       ],
       "js": [
+        "netflix-engine.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://*.netflix.com/*"
+      ],
+      "js": [
         "netflix-inject.js"
       ],
       "run_at": "document_start",

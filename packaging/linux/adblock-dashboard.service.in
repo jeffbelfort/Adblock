@@ -1,0 +1,15 @@
+[Unit]
+Description=Custom Adblock Dashboard
+After=adblock-dns.service
+
+[Service]
+Type=simple
+User=@USER@
+WorkingDirectory=@PROJECT_DIR@/dashboard
+ExecStart=@PROJECT_DIR@/dashboard/adblock-dashboard
+Restart=on-failure
+RestartSec=3
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

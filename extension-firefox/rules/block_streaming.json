@@ -1,0 +1,252 @@
+[
+  {
+    "id": 201,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||itvx.co.uk/csai/",
+      "resourceTypes": [
+        "xmlhttprequest",
+        "sub_frame",
+        "media"
+      ]
+    }
+  },
+  {
+    "id": 202,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||itvx.co.uk/ssai/",
+      "resourceTypes": [
+        "xmlhttprequest",
+        "sub_frame",
+        "media"
+      ]
+    }
+  },
+  {
+    "id": 203,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||adserver.itv.com^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest",
+        "sub_frame",
+        "media"
+      ]
+    }
+  },
+  {
+    "id": 204,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||channel4.com/*/vast/",
+      "resourceTypes": [
+        "xmlhttprequest",
+        "sub_frame",
+        "media"
+      ]
+    }
+  },
+  {
+    "id": 205,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||ads.channel4.com^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest",
+        "sub_frame",
+        "media"
+      ]
+    }
+  },
+  {
+    "id": 206,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||my5.tv/adserver/",
+      "resourceTypes": [
+        "xmlhttprequest",
+        "sub_frame",
+        "media"
+      ]
+    }
+  },
+  {
+    "id": 207,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||5cf.io^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest",
+        "sub_frame",
+        "media"
+      ]
+    }
+  },
+  {
+    "id": 208,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||fw.tv^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest",
+        "sub_frame",
+        "media"
+      ]
+    }
+  },
+  {
+    "id": 209,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||cdn.fwmrm.net^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest",
+        "sub_frame",
+        "media"
+      ]
+    }
+  },
+  {
+    "id": 210,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||23video.com^",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest",
+        "sub_frame",
+        "media"
+      ]
+    }
+  },
+  {
+    "id": 211,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||4od.co.uk/adserver",
+      "resourceTypes": [
+        "script",
+        "xmlhttprequest",
+        "sub_frame",
+        "media"
+      ]
+    }
+  },
+  {
+    "id": 212,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||ad-ops-ingest-itv-ds-prd*",
+      "resourceTypes": [
+        "xmlhttprequest",
+        "script",
+        "sub_frame",
+        "media"
+      ]
+    }
+  },
+  {
+    "id": 213,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||itv-ds-prd*type=paid*",
+      "resourceTypes": [
+        "xmlhttprequest",
+        "script",
+        "sub_frame",
+        "media"
+      ]
+    }
+  },
+  {
+    "id": 214,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||collector*TPCAMPAIGNID*",
+      "resourceTypes": [
+        "xmlhttprequest",
+        "image"
+      ]
+    }
+  },
+  {
+    "id": 215,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||desktop*addur=*",
+      "initiatorDomains": [
+        "itvx.co.uk"
+      ],
+      "resourceTypes": [
+        "xmlhttprequest",
+        "image"
+      ]
+    }
+  },
+  {
+    "id": 218,
+    "priority": 3,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||tpsc-video.doubleverify.com^",
+      "resourceTypes": [
+        "xmlhttprequest",
+        "image",
+        "ping"
+      ]
+    }
+  }
+]

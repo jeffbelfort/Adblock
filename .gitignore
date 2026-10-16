@@ -4,3 +4,17 @@ extension/_metadata/
 extension/netflix-player.js
 dashboard/AdblockDashboard.exe
 dns/AdblockDNS.exe
+
+# Local builds and runtime logs
+/dns/adblock-dns
+/dashboard/adblock-dashboard
+*.log
+
+# Editor and source backups
+*.jsbak
+*.backup-*
+
+# Machine-specific dashboard configuration
+/dashboard/config.json
+/extension-firefox/netflix-player.js
+/extension-firefox/_metadata/
