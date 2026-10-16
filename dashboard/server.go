@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -28,6 +29,7 @@ var dashboardAPIToken string
 func runDashboard() {
 	setupPaths()
 	setupLogging()
+
 	dashboardAPIToken = newDashboardAPIToken()
 
 	log.Println("[adblock-dashboard] Starting on http://localhost:9001")
@@ -35,6 +37,7 @@ func runDashboard() {
 	mux := http.NewServeMux()
 	webDir := filepath.Join(exeDir(), "web")
 	fileServer := http.FileServer(http.Dir(webDir))
+
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
 			serveDashboardIndex(w, r, webDir)
@@ -65,10 +68,12 @@ func runDashboard() {
 func setupPaths() {
 	cfgPath := filepath.Join(exeDir(), "config.json")
 	data, err := os.ReadFile(cfgPath)
+
 	if err == nil {
 		var cfg struct {
 			DNSDir string `json:"dns_dir"`
 		}
+
 		if json.Unmarshal(data, &cfg) == nil && cfg.DNSDir != "" {
 			dnsLogPath = filepath.Join(cfg.DNSDir, "adblock-dns.log")
 			dnsBlocklistDir = filepath.Join(cfg.DNSDir, "blocklists")
@@ -77,6 +82,7 @@ func setupPaths() {
 			return
 		}
 	}
+
 	base := filepath.Dir(exeDir())
 	dnsLogPath = filepath.Join(base, "dns", "adblock-dns.log")
 	dnsBlocklistDir = filepath.Join(base, "dns", "blocklists")
@@ -97,6 +103,7 @@ func setupLogging() {
 	if err != nil {
 		return
 	}
+
 	log.SetOutput(f)
 	log.SetFlags(log.Ldate | log.Ltime)
 }
@@ -116,7 +123,9 @@ func serveDashboardIndex(w http.ResponseWriter, r *http.Request, webDir string) 
 		http.Error(w, "dashboard unavailable", http.StatusInternalServerError)
 		return
 	}
+
 	page := strings.ReplaceAll(string(data), "__ADBLOCK_API_TOKEN__", dashboardAPIToken)
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	_, _ = w.Write([]byte(page))
@@ -135,7 +144,9 @@ func dashboardSecurityMiddleware(next http.Handler) http.Handler {
 		}
 
 		origin := strings.ToLower(r.Header.Get("Origin"))
-		if origin != "" && origin != "http://localhost:9001" && origin != "http://127.0.0.1:9001" {
+		if origin != "" &&
+			origin != "http://localhost:9001" &&
+			origin != "http://127.0.0.1:9001" {
 			http.Error(w, "cross-origin request denied", http.StatusForbidden)
 			return
 		}
@@ -147,7 +158,11 @@ func dashboardSecurityMiddleware(next http.Handler) http.Handler {
 
 		if r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/api/") {
 			provided := r.Header.Get("X-Adblock-Token")
-			if len(provided) != len(dashboardAPIToken) || subtle.ConstantTimeCompare([]byte(provided), []byte(dashboardAPIToken)) != 1 {
+			if len(provided) != len(dashboardAPIToken) ||
+				subtle.ConstantTimeCompare(
+					[]byte(provided),
+					[]byte(dashboardAPIToken),
+				) != 1 {
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
 			}
@@ -163,57 +178,87 @@ func writeJSON(w http.ResponseWriter, data interface{}) {
 }
 
 func handleStatus(w http.ResponseWriter, r *http.Request) {
-	dnsRunning := isDNSRunning()
-	blockedToday := countBlockedToday()
-	blockedTotal := countBlockedTotal()
-	domainCount := countLoadedDomains()
-
 	writeJSON(w, map[string]interface{}{
-		"dns_running":   dnsRunning,
-		"blocked_today": blockedToday,
-		"blocked_total": blockedTotal,
-		"domain_count":  domainCount,
+		"dns_running":   isDNSRunning(),
+		"blocked_today": countBlockedToday(),
+		"blocked_total": countBlockedTotal(),
+		"domain_count":  countLoadedDomains(),
 		"timestamp":     time.Now().Unix(),
 	})
 }
 
 func handleDNSStart(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
+	if r.Method != http.MethodPost {
 		http.Error(w, "POST only", http.StatusMethodNotAllowed)
 		return
 	}
+
 	cmd := exec.Command(dnsBinaryPath, "start")
+	if runtime.GOOS == "linux" {
+		cmd = exec.Command(
+			"/usr/bin/sudo",
+			"-n",
+			"/usr/bin/systemctl",
+			"start",
+			"adblock-dns.service",
+		)
+	}
+
 	if err := cmd.Run(); err != nil {
-		writeJSON(w, map[string]interface{}{"ok": false, "error": err.Error()})
+		writeJSON(w, map[string]interface{}{
+			"ok":    false,
+			"error": err.Error(),
+		})
 		return
 	}
+
 	writeJSON(w, map[string]interface{}{"ok": true})
 }
 
 func handleDNSStop(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
+	if r.Method != http.MethodPost {
 		http.Error(w, "POST only", http.StatusMethodNotAllowed)
 		return
 	}
+
 	cmd := exec.Command(dnsBinaryPath, "stop")
+	if runtime.GOOS == "linux" {
+		cmd = exec.Command(
+			"/usr/bin/sudo",
+			"-n",
+			"/usr/bin/systemctl",
+			"stop",
+			"adblock-dns.service",
+		)
+	}
+
 	if err := cmd.Run(); err != nil {
-		writeJSON(w, map[string]interface{}{"ok": false, "error": err.Error()})
+		writeJSON(w, map[string]interface{}{
+			"ok":    false,
+			"error": err.Error(),
+		})
 		return
 	}
+
 	writeJSON(w, map[string]interface{}{"ok": true})
 }
 
-// handleDNSLogs returns recent unique blocked domains
+// handleDNSLogs returns recent unique blocked domains.
 func handleDNSLogs(w http.ResponseWriter, r *http.Request) {
 	entries := getBlockedEntries(500)
 
-	// Deduplicate: keep only most recent occurrence of each domain per minute
 	seen := make(map[string]bool)
 	var deduped []map[string]string
 
 	for i := len(entries) - 1; i >= 0; i-- {
 		e := entries[i]
-		key := e["domain"] + "|" + e["time"][:13]
+
+		timeKey := e["time"]
+		if len(timeKey) > 13 {
+			timeKey = timeKey[:13]
+		}
+
+		key := e["domain"] + "|" + timeKey
 
 		if !seen[key] {
 			seen[key] = true
@@ -232,7 +277,7 @@ func handleDNSLogs(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, deduped)
 }
 
-// handleDNSHistory returns full block history for the history page
+// handleDNSHistory returns block history for the history page.
 func handleDNSHistory(w http.ResponseWriter, r *http.Request) {
 	entries := getBlockedEntries(5000)
 
@@ -264,7 +309,7 @@ func handleDNSHistory(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleDNSGraph returns blocks per hour for the last 24 hours
+// handleDNSGraph returns blocks per hour for the last 24 hours.
 func handleDNSGraph(w http.ResponseWriter, r *http.Request) {
 	entries := getBlockedEntries(10000)
 
@@ -276,8 +321,7 @@ func handleDNSGraph(w http.ResponseWriter, r *http.Request) {
 	for i := 23; i >= 0; i-- {
 		t := now.Add(time.Duration(-i) * time.Hour)
 		key := t.Format("2006/01/02 15")
-		label := t.Format("15:00")
-		labels[23-i] = label
+		labels[23-i] = t.Format("15:00")
 		hours[key] = 0
 	}
 
@@ -312,11 +356,9 @@ func handleBlocklists(w http.ResponseWriter, r *http.Request) {
 	var lists []map[string]interface{}
 
 	for _, f := range files {
-		count := countDomainsInFile(f)
-
 		lists = append(lists, map[string]interface{}{
 			"name":  filepath.Base(f),
-			"count": count,
+			"count": countDomainsInFile(f),
 		})
 	}
 
@@ -377,15 +419,7 @@ func handleAddDomain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if containsControlCharacter(domain) {
-		writeJSON(w, map[string]interface{}{
-			"ok":    false,
-			"error": "invalid domain",
-		})
-		return
-	}
-
-	if !isValidHostname(domain) {
+	if containsControlCharacter(domain) || !isValidHostname(domain) {
 		writeJSON(w, map[string]interface{}{
 			"ok":    false,
 			"error": "invalid domain",
@@ -505,9 +539,16 @@ func getBlockedEntries(maxLines int) []map[string]string {
 }
 
 func isDNSRunning() bool {
-	cmd := exec.Command("sc", "query", "AdblockDNS")
+	if runtime.GOOS == "linux" {
+		return exec.Command(
+			"/usr/bin/systemctl",
+			"is-active",
+			"--quiet",
+			"adblock-dns.service",
+		).Run() == nil
+	}
 
-	out, err := cmd.Output()
+	out, err := exec.Command("sc", "query", "AdblockDNS").Output()
 	if err != nil {
 		return false
 	}
@@ -552,13 +593,11 @@ func countLoadedDomains() int {
 
 		if strings.Contains(line, "blocked domains") &&
 			strings.Contains(line, "Loaded") {
-
 			fields := strings.Fields(line)
 
 			for j, field := range fields {
 				if field == "Loaded" && j+1 < len(fields) {
 					var n int
-
 					fmt.Sscanf(fields[j+1], "%d", &n)
 
 					if n > 0 {

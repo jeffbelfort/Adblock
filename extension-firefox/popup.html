@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #1a1a1a;
+  --surface: #242424;
+  --border: #333;
+  --text: #e0e0e0;
+  --muted: #777;
+  --green: #1D9E75;
+  --red: #e24b4a;
+  --blue: #4a9eff;
+}
+body {
+  width: 320px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  user-select: none;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.header-left { display: flex; align-items: center; gap: 10px; }
+.logo {
+  width: 30px; height: 30px;
+  background: var(--green);
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 15px; color: white;
+}
+.site-info {}
+.site-name { font-size: 13px; font-weight: 600; color: var(--text); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.site-status { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+/* Power button */
+.power-btn {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 2px solid var(--green);
+  background: transparent;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+  color: var(--green);
+}
+.power-btn:hover { background: var(--green); color: white; }
+.power-btn.off { border-color: var(--red); color: var(--red); }
+.power-btn.off:hover { background: var(--red); color: white; }
+.power-btn svg { width: 16px; height: 16px; }
+
+/* Stats row */
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  border-bottom: 1px solid var(--border);
+}
+.stat {
+  padding: 12px 0;
+  text-align: center;
+  border-right: 1px solid var(--border);
+}
+.stat:last-child { border-right: none; }
+.stat-value { font-size: 22px; font-weight: 700; color: var(--green); line-height: 1; }
+.stat-value.zero { color: var(--muted); }
+.stat-label { font-size: 10px; color: var(--muted); margin-top: 3px; text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* Page blocks */
+.page-blocks {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  min-height: 60px;
+}
+.page-blocks-title { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
+.block-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 3px 0;
+  font-size: 11px;
+}
+.block-domain { color: var(--red); font-family: monospace; }
+.block-count { color: var(--muted); font-size: 10px; }
+.no-blocks { color: var(--muted); font-size: 11px; font-style: italic; }
+
+/* Controls */
+.controls {
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.control-row {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.control-label { font-size: 12px; color: var(--text); }
+.control-sub { font-size: 10px; color: var(--muted); }
+.toggle {
+  width: 36px; height: 20px;
+  background: var(--border);
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.toggle.on { background: var(--green); }
+.toggle::after {
+  content: '';
+  position: absolute;
+  width: 14px; height: 14px;
+  background: white;
+  border-radius: 50%;
+  top: 3px; left: 3px;
+  transition: transform 0.2s;
+}
+.toggle.on::after { transform: translateX(16px); }
+
+/* Footer */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+}
+.footer-link {
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+  text-decoration: none;
+  display: flex; align-items: center; gap: 4px;
+  transition: color 0.15s;
+}
+.footer-link:hover { color: var(--text); }
+.footer-link svg { width: 12px; height: 12px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo">A</div>
+    <div class="site-info">
+      <div class="site-name" id="site-name">Loading...</div>
+      <div class="site-status" id="site-status">Checking...</div>
+    </div>
+  </div>
+  <button class="power-btn" id="power-btn" title="Toggle for this site">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/>
+      <line x1="12" y1="2" x2="12" y2="12"/>
+    </svg>
+  </button>
+</div>
+
+<div class="stats">
+  <div class="stat">
+    <div class="stat-value" id="stat-page">0</div>
+    <div class="stat-label">This page</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value" id="stat-today">0</div>
+    <div class="stat-label">Today</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value" id="stat-total">0</div>
+    <div class="stat-label">Total</div>
+  </div>
+</div>
+
+<div class="page-blocks">
+  <div class="page-blocks-title">Blocked on this page</div>
+  <div id="page-block-list"><div class="no-blocks">Nothing blocked yet</div></div>
+</div>
+
+<div class="controls">
+  <div class="control-row">
+    <div>
+      <div class="control-label">Request blocking</div>
+      <div class="control-sub">declarativeNetRequest rules</div>
+    </div>
+    <button class="toggle on" id="toggle-requests"></button>
+  </div>
+  <div class="control-row">
+    <div>
+      <div class="control-label">Cosmetic filtering</div>
+      <div class="control-sub">Remove ad elements from DOM</div>
+    </div>
+    <button class="toggle on" id="toggle-cosmetic"></button>
+  </div>
+</div>
+
+<div class="footer">
+  <a class="footer-link" id="open-dashboard">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+    Dashboard
+  </a>
+  <a class="footer-link" id="open-filters">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+    Filter lists
+  </a>
+  <a class="footer-link" id="open-logs">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    Logs
+  </a>
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>
