@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Adblock (Firefox)",
+  "name": "Adblock",
   "version": "2.0.1",
   "description": "Custom ad blocker. DNS + request blocking + cosmetic filtering + uBlock filter compatibility.",
   "permissions": [
